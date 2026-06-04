@@ -97,7 +97,7 @@ struct VditorEditorView: NSViewRepresentable {
         func loadEditorHTML() {
             guard let webView else { return }
             guard let url = Bundle.module.url(forResource: "vditor", withExtension: "html") else {
-                parent.statusMessage = "未找到 Vditor 编辑器资源。"
+                parent.statusMessage = "未找到 Vditor 编辑器资源（vditor.html）。"
                 return
             }
 

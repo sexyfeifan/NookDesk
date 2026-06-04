@@ -1,5 +1,5 @@
 /*!
- * Vditor v3.11.1 - A markdown editor written in TypeScript.
+ * Vditor v3.10.9 - A markdown editor written in TypeScript.
  *
  * MIT License
  *
@@ -25,7 +25,7 @@
  *
  */
 /*!
- * Vditor v3.11.1 - A markdown editor written in TypeScript.
+ * Vditor v3.10.9 - A markdown editor written in TypeScript.
  *
  * MIT License
  *
@@ -277,9 +277,8 @@
   z-index: 3;
   font-size: 14px;
   display: none;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  -moz-user-select: none;
+       user-select: none;
   max-width: 320px;
   min-width: 80px;
   animation-duration: 0.15s;
@@ -600,9 +599,8 @@
   background-color: var(--count-background-color);
   border-radius: 3px;
   font-size: 12px;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  -moz-user-select: none;
+       user-select: none;
   float: right;
   margin: 8px 3px 0 0;
 }
@@ -613,9 +611,8 @@
 .vditor-resize {
   padding: 3px 0;
   cursor: row-resize;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  -moz-user-select: none;
+       user-select: none;
   position: absolute;
   width: 100%;
 }
@@ -725,9 +722,8 @@
   align-items: center;
   cursor: pointer;
   margin-left: 24px;
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  -moz-user-select: none;
+       user-select: none;
   color: var(--toolbar-icon-color);
 }
 .vditor-img__btn:hover {
@@ -1119,13 +1115,12 @@
 .vditor-linenumber__rows {
   position: absolute;
   pointer-events: none;
-  top: 1em;
+  top: 0.5em;
   left: 0;
   width: 3em;
   /* works for line-numbers below 1000 lines */
-  -webkit-user-select: none;
-     -moz-user-select: none;
-          user-select: none;
+  -moz-user-select: none;
+       user-select: none;
   counter-reset: linenumber;
 }
 .vditor-linenumber__rows > span {
@@ -1254,9 +1249,8 @@
 }
 .vditor-toc {
   margin-bottom: 16px;
-  -webkit-user-select: text;
-     -moz-user-select: text;
-          user-select: text;
+  -moz-user-select: text;
+       user-select: text;
   color: #4285f4;
 }
 .vditor-toc .vditor-outline__action {

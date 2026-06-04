@@ -10,6 +10,7 @@ struct SettingsView: View {
     @State private var scaffoldRemoteURL = ProjectScaffoldingService.defaultTemplateURL
     @State private var scaffoldInProgress = false
     @State private var scaffoldResult: String?
+    @State private var scaffoldLog: [String] = []
 
     var body: some View {
         ScrollView {
@@ -348,8 +349,16 @@ struct SettingsView: View {
                         NookButton(.primary, size: .small, label: "拉取项目结构") {
                             scaffoldResult = nil
                             scaffoldInProgress = true
+                            scaffoldLog = []
                             Task {
-                                let result = await viewModel.cloneProjectFromGitHubWithProgress(url: scaffoldRemoteURL)
+                                let result = await viewModel.cloneProjectFromGitHubWithProgress(
+                                    url: scaffoldRemoteURL,
+                                    log: { message in
+                                        DispatchQueue.main.async {
+                                            scaffoldLog.append(message)
+                                        }
+                                    }
+                                )
                                 scaffoldResult = result
                                 scaffoldInProgress = false
                             }

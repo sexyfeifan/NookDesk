@@ -506,8 +506,18 @@ struct WizardView: View {
         if currentStep == 1 {
             let trimmed = projectPath.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { return }
-            viewModel.setProjectRootPath(trimmed)
-            detectedBackendName = viewModel.project.backend.displayName
+
+            // 检查目录是否存在
+            var isDir = ObjCBool(false)
+            let exists = FileManager.default.fileExists(atPath: trimmed, isDirectory: &isDir)
+            if exists && isDir.boolValue {
+                viewModel.project.rootPath = URL(fileURLWithPath: trimmed, isDirectory: true).path
+                UserDefaults.standard.set(trimmed, forKey: BlogProject.lastRootPathDefaultsKey)
+                detectedBackendName = viewModel.project.backend.displayName
+            } else {
+                wizardError = "目录不存在：\(trimmed)"
+                return
+            }
         }
         if currentStep == 2 {
             let remote = githubRemoteURL.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -517,6 +527,7 @@ struct WizardView: View {
                 viewModel.saveRemoteProfile()
             }
         }
+        wizardError = nil
         withAnimation(NookAnimations.nookEase) {
             currentStep += 1
             saveProgress()
@@ -536,26 +547,42 @@ struct WizardView: View {
             return
         }
 
+        // 拼接完整路径：用户选的目录 + 仓库名
+        let repoName = trimmedURL
+            .replacingOccurrences(of: ".git", with: "")
+            .split(separator: "/").last.map(String.init) ?? "blog"
+        let fullPath = (trimmedPath as NSString).appendingPathComponent(repoName)
+
         isCloning = true
         cloneError = nil
-        cloneLog = ["正在克隆 \(trimmedURL)..."]
-        projectPath = trimmedPath
-
-        viewModel.setProjectRootPath(trimmedPath)
+        cloneLog = ["正在克隆 \(trimmedURL)...", "目标路径: \(fullPath)"]
 
         Task {
-            let result = await viewModel.cloneProjectFromGitHubWithProgress(url: trimmedURL)
-            isCloning = false
+            let result = await viewModel.cloneProjectFromGitHubWithProgress(
+                url: trimmedURL,
+                targetPath: fullPath,
+                log: { message in
+                    DispatchQueue.main.async {
+                        self.cloneLog.append(message)
+                    }
+                }
+            )
 
-            if result.contains("失败") || result.contains("错误") || result.contains("不能") {
-                cloneError = result
-                cloneLog.append("克隆失败。")
-            } else {
-                cloneLog.append("克隆完成。")
-                cloneLog.append("检测到 \(viewModel.project.backend.displayName) 项目。")
-                cloneLog.append("初始化完成。")
-                detectedBackendName = viewModel.project.backend.displayName
-                showCloneOption = false
+            await MainActor.run {
+                isCloning = false
+
+                if result.contains("失败") {
+                    cloneError = result
+                    cloneLog.append("❌ 克隆失败。")
+                } else {
+                    projectPath = fullPath
+                    cloneLog.append("✅ 克隆完成！")
+                    detectedBackendName = viewModel.project.backend.displayName
+                    cloneLog.append("✅ 检测到 \(detectedBackendName) 项目")
+                    cloneLog.append("✅ 项目路径: \(fullPath)")
+                    // 自动关闭克隆面板，显示项目路径
+                    showCloneOption = false
+                }
             }
         }
     }

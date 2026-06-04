@@ -1571,62 +1571,51 @@ final class AppViewModel: ObservableObject {
         }
     }
 
-    func cloneProjectFromGitHubWithProgress(url: String) async -> String {
+    func cloneProjectFromGitHubWithProgress(url: String, targetPath: String? = nil, log: ((String) -> Void)? = nil) async -> String {
         let trimmedURL = url.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedURL.isEmpty else {
             return "请填写 GitHub 仓库 URL。"
         }
 
-        let trimmedPath = project.rootPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedPath = (targetPath ?? project.rootPath).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedPath.isEmpty else {
             return "项目路径不能为空。"
         }
 
-        appendPublishLog(
-            operation: "拉取项目结构",
-            summary: "正在克隆仓库...",
-            details: "URL: \(trimmedURL)\n目标: \(trimmedPath)",
-            level: .info
-        )
+        log?("开始克隆: \(trimmedURL)")
+        log?("目标路径: \(trimmedPath)")
 
         do {
             let result = try scaffoldingService.scaffoldFromRemote(
                 remoteURL: trimmedURL,
                 localPath: trimmedPath,
-                force: false
+                force: false,
+                log: log
             )
 
-            appendPublishLog(
-                operation: "拉取项目结构",
-                summary: "克隆完成，正在检测项目类型...",
-                details: result,
-                level: .info
-            )
+            log?("正在设置项目...")
+
+            // 关键：克隆成功后，设置项目根目录
+            project.rootPath = URL(fileURLWithPath: trimmedPath, isDirectory: true).path
 
             let targetURL = URL(fileURLWithPath: trimmedPath, isDirectory: true)
             if let detected = BackendRegistry.shared.detectBackend(in: targetURL) {
                 project.backendName = detected.displayName
                 project.contentSubpath = detected.preferredContentSubpath(in: targetURL)
+                log?("后端类型: \(detected.displayName)")
+                log?("内容目录: \(detected.preferredContentSubpath(in: targetURL))")
             }
+
+            // 保存到 UserDefaults
+            UserDefaults.standard.set(trimmedPath, forKey: BlogProject.lastRootPathDefaultsKey)
 
             loadAll()
 
-            let backendName = project.backend.displayName
-            appendPublishLog(
-                operation: "拉取项目结构",
-                summary: "项目初始化完成",
-                details: "检测到 \(backendName) 项目。",
-                level: .success
-            )
-
-            return "项目初始化完成（\(backendName)）。\(result)"
+            log?("项目初始化完成！")
+            return "项目初始化完成。\(result)"
         } catch {
-            appendPublishLog(
-                operation: "拉取项目结构",
-                summary: "克隆失败",
-                details: error.localizedDescription,
-                level: .error
-            )
+            log?("错误: \(error.localizedDescription)")
+            return "克隆失败：\(error.localizedDescription)"
             return "克隆失败：\(error.localizedDescription)"
         }
     }
