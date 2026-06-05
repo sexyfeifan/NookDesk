@@ -379,21 +379,42 @@ struct SettingsView: View {
                         }
                     }
 
+                    if !scaffoldLog.isEmpty {
+                        VStack(alignment: .leading, spacing: 2) {
+                            ForEach(scaffoldLog.indices, id: \.self) { i in
+                                Text(scaffoldLog[i])
+                                    .font(.system(.caption, design: .monospaced))
+                                    .foregroundColor(.aiTextMuted)
+                            }
+                        }
+                        .padding(8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.aiBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+
                     if let result = scaffoldResult {
-                        Text(result)
-                            .font(.custom("Nunito-Regular", size: 11))
-                            .foregroundColor(.aiTextMuted)
-                            .textSelection(.enabled)
+                        StatusBadge(
+                            text: result,
+                            level: result.contains("完成") ? .ok : (result.contains("失败") ? .error : .info)
+                        )
                     }
                 }
             }
 
             advancedGroup("Workflow 管理") {
-                HStack(spacing: 10) {
-                    NookButton(.default, size: .small, label: "生成 Workflow") {
-                        viewModel.bootstrapGitHubPagesWorkflow()
+                VStack(alignment: .leading, spacing: 8) {
+                    let workflowExists = viewModel.hasGitHubPagesWorkflow
+                    HStack(spacing: 10) {
+                        if workflowExists {
+                            StatusBadge(text: "Workflow 已存在", level: .ok)
+                        } else {
+                            NookButton(.primary, size: .small, label: "生成 Workflow") {
+                                viewModel.bootstrapGitHubPagesWorkflow()
+                            }
+                        }
+                        Spacer()
                     }
-                    Spacer()
                 }
             }
 
@@ -403,7 +424,7 @@ struct SettingsView: View {
                         Text("当前版本：")
                             .font(.custom("Nunito-SemiBold", size: 12))
                             .foregroundColor(.aiTextSecondary)
-                        Text(AppVersion.current)
+                        Text("v\(AppVersion.current)")
                             .font(.custom("Nunito-Bold", size: 14))
                             .foregroundColor(.aiPrimary)
                     }
@@ -422,7 +443,7 @@ struct SettingsView: View {
                         }
 
                         if let update = viewModel.updateInfo {
-                            NookButton(.primary, size: .small, label: "下载 \(update.version)") {
+                            NookButton(.primary, size: .small, label: "下载 v\(update.version)") {
                                 Task {
                                     await viewModel.downloadUpdate()
                                 }
@@ -434,9 +455,11 @@ struct SettingsView: View {
 
                     if let update = viewModel.updateInfo {
                         StatusBadge(
-                            text: "新版本 \(update.version) 可用",
+                            text: "发现新版本 v\(update.version)",
                             level: .info
                         )
+                    } else if !viewModel.isCheckingUpdate && viewModel.statusText.contains("最新版本") {
+                        StatusBadge(text: "已是最新版本", level: .ok)
                     }
                 }
             }

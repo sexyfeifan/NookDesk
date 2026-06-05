@@ -1523,9 +1523,9 @@ final class AppViewModel: ObservableObject {
                 let info = try await updateService.checkForUpdates(currentVersion: AppVersion.current)
                 if let info {
                     updateInfo = info
-                    statusText = "发现新版本 \(info.version)。"
+                    statusText = "发现新版本 v\(info.version)"
                 } else {
-                    statusText = "当前已是最新版本。"
+                    statusText = "已是最新版本"
                 }
             } catch {
                 statusText = "检查更新失败：\(error.localizedDescription)"
@@ -1580,41 +1580,58 @@ final class AppViewModel: ObservableObject {
             return "项目路径不能为空。"
         }
 
+        let targetURL = URL(fileURLWithPath: trimmedPath, isDirectory: true)
+        let fm = FileManager.default
+        let alreadyExists = fm.fileExists(atPath: trimmedPath)
+            && ((try? fm.contentsOfDirectory(atPath: targetURL.path).isEmpty) == false)
+
         log?("开始克隆: \(trimmedURL)")
         log?("目标路径: \(trimmedPath)")
 
+        if alreadyExists {
+            log?("目录已存在，跳过克隆。")
+        }
+
         do {
-            let result = try scaffoldingService.scaffoldFromRemote(
-                remoteURL: trimmedURL,
-                localPath: trimmedPath,
-                force: false,
-                log: log
-            )
+            let result: String
+            if alreadyExists {
+                result = "目录已存在"
+            } else {
+                result = try scaffoldingService.scaffoldFromRemote(
+                    remoteURL: trimmedURL,
+                    localPath: trimmedPath,
+                    force: false,
+                    log: log
+                )
+            }
 
             log?("正在设置项目...")
 
-            // 关键：克隆成功后，设置项目根目录
             project.rootPath = URL(fileURLWithPath: trimmedPath, isDirectory: true).path
 
-            let targetURL = URL(fileURLWithPath: trimmedPath, isDirectory: true)
+            var backendName = "未知"
             if let detected = BackendRegistry.shared.detectBackend(in: targetURL) {
                 project.backendName = detected.displayName
                 project.contentSubpath = detected.preferredContentSubpath(in: targetURL)
+                backendName = detected.displayName
                 log?("后端类型: \(detected.displayName)")
                 log?("内容目录: \(detected.preferredContentSubpath(in: targetURL))")
             }
 
-            // 保存到 UserDefaults
             UserDefaults.standard.set(trimmedPath, forKey: BlogProject.lastRootPathDefaultsKey)
 
             loadAll()
 
             log?("项目初始化完成！")
-            return "项目初始化完成。\(result)"
+
+            if alreadyExists {
+                return "项目已存在于 \(trimmedPath)，检测到 \(backendName) 项目。"
+            } else {
+                return "拉取完成，路径: \(trimmedPath)，检测到 \(backendName) 项目。"
+            }
         } catch {
             log?("错误: \(error.localizedDescription)")
-            return "克隆失败：\(error.localizedDescription)"
-            return "克隆失败：\(error.localizedDescription)"
+            return "拉取失败：\(error.localizedDescription)\n建议检查网络连接和仓库 URL 是否正确。"
         }
     }
 
@@ -2015,6 +2032,10 @@ final class AppViewModel: ObservableObject {
         publishLogEntries.filter { Self.buildToolOperationNames.contains($0.operation) }
     }
 
+    var hasGitHubPagesWorkflow: Bool {
+        publishService.hasGitHubPagesWorkflow(project: project)
+    }
+
     var buildToolLog: String {
         buildToolLogEntries.map(\.rendered).joined(separator: "\n\n")
     }
@@ -2072,14 +2093,17 @@ final class AppViewModel: ObservableObject {
             )
         )
 
+        let nodeModulesPath = project.rootURL.appendingPathComponent("node_modules")
         let nodeModulesExists: Bool = {
             var isDir = ObjCBool(false)
-            return fm.fileExists(atPath: root.appendingPathComponent("node_modules").path, isDirectory: &isDir) && isDir.boolValue
+            return fm.fileExists(atPath: nodeModulesPath.path, isDirectory: &isDir) && isDir.boolValue
         }()
         checks.append(
             PublishCheck(
                 title: "node_modules",
-                detail: nodeModulesExists ? "已安装依赖。" : "未找到 node_modules，请先运行 npm install。",
+                detail: nodeModulesExists
+                    ? "已安装依赖。"
+                    : "未找到 node_modules，请在终端运行: cd \(project.rootURL.path) && npm install",
                 level: nodeModulesExists ? .ok : .error
             )
         )

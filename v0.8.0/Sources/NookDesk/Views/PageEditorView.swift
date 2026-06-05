@@ -177,13 +177,18 @@ struct PageEditorView: View {
                         Image(systemName: "arrow.right.circle.fill")
                             .font(.system(size: 10))
                             .foregroundColor(.aiPrimary)
-                        Text(field.affects)
+                        Text("影响: \(field.affects)")
                             .font(.custom("Nunito-Regular", size: 11))
                             .foregroundColor(.aiPrimary)
                     }
                 }
 
                 Spacer()
+
+                NookButton(.primary, size: .small, label: "保存") {
+                    saveSingleField(field)
+                }
+                .disabled((editingValues[field.id] ?? field.currentValue) == field.currentValue)
             }
 
             if field.currentValue.count > 80 {
@@ -250,12 +255,22 @@ struct PageEditorView: View {
             return
         }
 
+        func lineHint(for marker: String) -> String {
+            let lines = content.components(separatedBy: .newlines)
+            for (i, line) in lines.enumerated() {
+                if line.contains(marker) {
+                    return "Home.tsx 第\(i + 1)行"
+                }
+            }
+            return "Home.tsx"
+        }
+
         var fields: [EditableField] = []
 
         fields.append(EditableField(
             name: "站点标题",
             currentValue: extractBetween(content, after: "blog-logo-title\">", before: "</div>") ?? "sexyfeifan 的小岛",
-            affects: "→ Home.tsx blog-logo-title",
+            affects: lineHint(for: "blog-logo-title"),
             description: "显示在博客左上角的品牌名称",
             filePath: "Home.tsx",
             lineHint: "blog-logo-title"
@@ -264,7 +279,7 @@ struct PageEditorView: View {
         fields.append(EditableField(
             name: "站点副标题",
             currentValue: extractBetween(content, after: "blog-logo-sub\">", before: "</div>") ?? "code, tools & random thoughts",
-            affects: "→ Home.tsx blog-logo-sub",
+            affects: lineHint(for: "blog-logo-sub"),
             description: "品牌名称下方的小字描述",
             filePath: "Home.tsx",
             lineHint: "blog-logo-sub"
@@ -273,7 +288,7 @@ struct PageEditorView: View {
         fields.append(EditableField(
             name: "英雄区打字文本",
             currentValue: extractBetween(content, after: "Typewriter", before: "</Typewriter>")?.replacingOccurrences(of: ">\n                            ", with: "").trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
-            affects: "→ Home.tsx Typewriter 组件",
+            affects: lineHint(for: "Typewriter"),
             description: "首页大标题的打字机动画文本",
             filePath: "Home.tsx",
             lineHint: "Typewriter"
@@ -282,7 +297,7 @@ struct PageEditorView: View {
         fields.append(EditableField(
             name: "英雄区描述",
             currentValue: extractBetween(content, after: "blog-hero-sub\">", before: "</p>")?.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
-            affects: "→ Home.tsx blog-hero-sub",
+            affects: lineHint(for: "blog-hero-sub"),
             description: "英雄区标题下方的描述段落",
             filePath: "Home.tsx",
             lineHint: "blog-hero-sub"
@@ -291,7 +306,7 @@ struct PageEditorView: View {
         fields.append(EditableField(
             name: "关于区头像 Emoji",
             currentValue: extractBetween(content, after: "blog-avatar\">", before: "</div>") ?? "🦊",
-            affects: "→ Home.tsx blog-avatar",
+            affects: lineHint(for: "blog-avatar"),
             description: "「关于我」区域的头像 emoji",
             filePath: "Home.tsx",
             lineHint: "blog-avatar"
@@ -300,7 +315,7 @@ struct PageEditorView: View {
         fields.append(EditableField(
             name: "关于区姓名/身份",
             currentValue: extractBetween(content, after: "<h3>", before: "</h3>") ?? "",
-            affects: "→ Home.tsx 关于区 h3",
+            affects: lineHint(for: "<h3>"),
             description: "「关于我」区域的姓名和身份描述",
             filePath: "Home.tsx",
             lineHint: "about h3"
@@ -309,19 +324,10 @@ struct PageEditorView: View {
         fields.append(EditableField(
             name: "关于区描述",
             currentValue: extractBetween(content, after: "关于我</h2>", before: "</Card>")?.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
-            affects: "→ Home.tsx 关于区 p",
+            affects: lineHint(for: "关于我</h2>"),
             description: "「关于我」区域的详细介绍",
             filePath: "Home.tsx",
             lineHint: "about p"
-        ))
-
-        fields.append(EditableField(
-            name: "页面标题 (title tag)",
-            currentValue: extractBetween(content, after: "<title>", before: "</title>") ?? "",
-            affects: "→ index.html <title>",
-            description: "浏览器标签页上显示的标题",
-            filePath: "index.html",
-            lineHint: "title"
         ))
 
         editableFields = fields
@@ -335,13 +341,23 @@ struct PageEditorView: View {
             return
         }
 
+        func lineHint(for marker: String) -> String {
+            let lines = content.components(separatedBy: .newlines)
+            for (i, line) in lines.enumerated() {
+                if line.contains(marker) {
+                    return "vite.config.ts 第\(i + 1)行"
+                }
+            }
+            return "vite.config.ts"
+        }
+
         var fields: [EditableField] = []
 
         let baseValue = extractBetween(content, after: "base:", before: ",")?.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "\"", with: "").replacingOccurrences(of: "'", with: "") ?? "/"
         fields.append(EditableField(
             name: "Base 路径",
             currentValue: baseValue,
-            affects: "→ vite.config.ts base",
+            affects: lineHint(for: "base:"),
             description: "部署 URL 的基础路径。GitHub Pages 用户页通常是 /，项目页是 /repo-name/",
             filePath: "vite.config.ts",
             lineHint: "base"
@@ -351,7 +367,7 @@ struct PageEditorView: View {
         fields.append(EditableField(
             name: "Less 预处理器",
             currentValue: hasLess ? "已启用" : "未启用",
-            affects: "→ vite.config.ts css.preprocessorOptions.less",
+            affects: lineHint(for: "less"),
             description: "是否启用 Less CSS 预处理器",
             filePath: "vite.config.ts",
             lineHint: "less"
@@ -361,7 +377,7 @@ struct PageEditorView: View {
         fields.append(EditableField(
             name: "SVGR 插件",
             currentValue: hasSvgr ? "已启用" : "未启用",
-            affects: "→ vite.config.ts plugins",
+            affects: lineHint(for: "svgr"),
             description: "是否启用 SVG 作为 React 组件的插件",
             filePath: "vite.config.ts",
             lineHint: "svgr"
@@ -378,12 +394,22 @@ struct PageEditorView: View {
             return
         }
 
+        func lineHint(for marker: String) -> String {
+            let lines = content.components(separatedBy: .newlines)
+            for (i, line) in lines.enumerated() {
+                if line.contains(marker) {
+                    return "index.html 第\(i + 1)行"
+                }
+            }
+            return "index.html"
+        }
+
         var fields: [EditableField] = []
 
         fields.append(EditableField(
             name: "页面标题",
             currentValue: extractBetween(content, after: "<title>", before: "</title>") ?? "",
-            affects: "→ index.html <title>",
+            affects: lineHint(for: "<title>"),
             description: "浏览器标签页上显示的标题，也用于搜索引擎结果",
             filePath: "index.html",
             lineHint: "title"
@@ -393,7 +419,7 @@ struct PageEditorView: View {
         fields.append(EditableField(
             name: "语言设置",
             currentValue: lang,
-            affects: "→ index.html <html lang>",
+            affects: lineHint(for: "<html lang"),
             description: "页面语言代码，如 zh-CN（中文）、ja（日语）、en（英语）",
             filePath: "index.html",
             lineHint: "lang"
@@ -403,7 +429,7 @@ struct PageEditorView: View {
         fields.append(EditableField(
             name: "字符编码",
             currentValue: charset,
-            affects: "→ index.html <meta charset>",
+            affects: lineHint(for: "charset"),
             description: "页面字符编码（通常保持 UTF-8）",
             filePath: "index.html",
             lineHint: "charset"
@@ -481,45 +507,93 @@ struct PageEditorView: View {
         }
     }
 
+    private func saveSingleField(_ field: EditableField) {
+        guard let newValue = editingValues[field.id], newValue != field.currentValue else {
+            statusMessage = "没有更改。"
+            return
+        }
+
+        let root = viewModel.project.rootURL
+        let filePath: URL
+        switch field.filePath {
+        case "Home.tsx":
+            filePath = root.appendingPathComponent("src/pages/Home/Home.tsx")
+        case "vite.config.ts":
+            filePath = root.appendingPathComponent("vite.config.ts")
+        case "index.html":
+            filePath = root.appendingPathComponent("index.html")
+        default:
+            return
+        }
+
+        guard var content = try? String(contentsOf: filePath, encoding: .utf8) else {
+            statusMessage = "无法读取文件。"
+            return
+        }
+
+        switch field.name {
+        case "站点标题":
+            content = replaceInHTML(content, cssClass: "blog-logo-title", newInner: newValue)
+        case "站点副标题":
+            content = replaceInHTML(content, cssClass: "blog-logo-sub", newInner: newValue)
+        case "关于区头像 Emoji":
+            content = replaceInHTML(content, cssClass: "blog-avatar", newInner: newValue)
+        case "页面标题":
+            content = replaceBetween(content, after: "<title>", before: "</title>", with: newValue)
+        case "语言设置":
+            content = content.replacingOccurrences(
+                of: "<html lang=\"\(field.currentValue)\">",
+                with: "<html lang=\"\(newValue)\">"
+            )
+        case "Base 路径":
+            content = content.replacingOccurrences(
+                of: "base: \"\(field.currentValue)\"",
+                with: "base: \"\(newValue)\""
+            )
+            if content.contains("base: '\(field.currentValue)'") {
+                content = content.replacingOccurrences(
+                    of: "base: '\(field.currentValue)'",
+                    with: "base: '\(newValue)'"
+                )
+            }
+        default:
+            break
+        }
+
+        do {
+            try content.write(to: filePath, atomically: true, encoding: .utf8)
+            statusMessage = "「\(field.name)」已保存到 \(field.filePath)。"
+            editingValues[field.id] = nil
+            loadFieldBasedContent()
+        } catch {
+            statusMessage = "保存失败：\(error.localizedDescription)"
+        }
+    }
+
     // MARK: - Posts Page Editor
 
     private var postsPageEditor: some View {
         VStack(alignment: .leading, spacing: 16) {
             NookCard(color: .appGreen) {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("posts.ts 文章管理")
-                        .font(.custom("Nunito-Bold", size: 16))
-                        .foregroundColor(.aiTextHeader)
+                    HStack(spacing: 8) {
+                        Image(systemName: "doc.text.fill")
+                            .foregroundColor(NookColor.appGreen.color)
+                        Text("posts.ts 文章数据")
+                            .font(.custom("Nunito-Bold", size: 16))
+                            .foregroundColor(.aiTextHeader)
+                    }
 
-                    Text("管理博客文章数据。文章存储在 src/pages/Home/posts.ts 中。请切换到「写作」标签页使用完整的文章编辑功能。")
+                    Text("文章数据通过写作页面管理。请切换到「写作」标签页使用完整的文章编辑功能，包括创建、编辑和删除文章。")
                         .font(.custom("Nunito-Medium", size: 13))
                         .foregroundColor(.aiTextSecondary)
 
-                    TextEditor(text: $editingText)
-                        .font(.system(.body, design: .monospaced))
-                        .frame(minHeight: 400)
-                        .padding(8)
-                        .background(Color.aiBackground)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-
-                    HStack(spacing: 8) {
-                        NookButton(.primary, size: .small, label: "保存") {
-                            savePageContent()
-                        }
-                        NookButton(.default, size: .small, label: "重新加载") {
-                            loadPageContent()
-                        }
-                        Spacer()
-                        if !statusMessage.isEmpty {
-                            Text(statusMessage)
-                                .font(.custom("Nunito-Regular", size: 12))
-                                .foregroundColor(.aiTextMuted)
-                        }
+                    NookButton(.primary, size: .small, label: "切换到写作页面") {
+                        NotificationCenter.default.post(name: .switchToWritingTab, object: nil)
                     }
                 }
             }
         }
-        .onAppear { loadPageContent() }
     }
 
     // MARK: - File Operations
@@ -596,4 +670,8 @@ struct PageEditorView: View {
         }
         return text
     }
+}
+
+extension Notification.Name {
+    static let switchToWritingTab = Notification.Name("switchToWritingTab")
 }

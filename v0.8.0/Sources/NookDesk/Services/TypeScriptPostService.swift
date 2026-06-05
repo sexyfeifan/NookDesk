@@ -83,33 +83,34 @@ final class TypeScriptPostService {
     // MARK: - Parsing
 
     func parsePosts(from content: String) -> [TSPPost] {
-        var posts: [TSPPost] = []
-
-        let objectPattern = #"\{[\s\S]*?id:\s*['"]([^'"]+)['"][\s\S]*?\}"#
-        guard let regex = try? NSRegularExpression(pattern: objectPattern, options: [.dotMatchesLineSeparators]) else {
+        guard let arrayStart = content.range(of: "export const posts"),
+              let bracketOpen = content[arrayStart.upperBound...].firstIndex(of: "[") else {
             return []
         }
 
-        let ns = content as NSString
-        let fullRange = NSRange(location: 0, length: ns.length)
+        let fromBracket = content[bracketOpen...]
+        guard let arrayEnd = findMatchingBracket(in: String(fromBracket), openAt: fromBracket.startIndex) else {
+            return []
+        }
 
-        var searchRange = fullRange
-        while searchRange.location < ns.length {
-            guard let match = regex.firstMatch(in: content, options: [], range: searchRange) else { break }
-            let block = ns.substring(with: match.range)
+        let arrayInner = content[content.index(after: bracketOpen)..<arrayEnd]
+        var posts: [TSPPost] = []
+        var searchStart = arrayInner.startIndex
+
+        while searchStart < arrayInner.endIndex {
+            guard let objOpen = arrayInner[searchStart...].firstIndex(of: "{") else { break }
+            guard let objClose = findMatchingObjectBrace(in: arrayInner, openAt: objOpen) else { break }
+            let block = String(arrayInner[objOpen...objClose])
             if let post = parseSinglePost(block) {
                 posts.append(post)
             }
-            let nextLoc = match.range.location + match.range.length
-            searchRange = NSRange(location: nextLoc, length: ns.length - nextLoc)
+            searchStart = arrayInner.index(after: objClose)
         }
 
         return posts
     }
 
     private func parseSinglePost(_ block: String) -> TSPPost? {
-        let ns = block as NSString
-
         func extractQuotedString(_ key: String) -> String {
             guard let keyRange = block.range(of: "\(key):") else { return "" }
             let afterKey = String(block[keyRange.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
@@ -131,22 +132,6 @@ final class TypeScriptPostService {
             return ""
         }
 
-        func findUnescapedClose(in text: String, closing: Character) -> String.Index? {
-            var i = text.startIndex
-            while i < text.endIndex {
-                if text[i] == "\\" {
-                    i = text.index(after: i)
-                    if i < text.endIndex { i = text.index(after: i) }
-                    continue
-                }
-                if text[i] == closing {
-                    return i
-                }
-                i = text.index(after: i)
-            }
-            return nil
-        }
-
         func extractArray(_ key: String) -> [String] {
             guard let keyRange = block.range(of: "\(key):") else { return [] }
             let afterKey = String(block[keyRange.upperBound...])
@@ -156,82 +141,6 @@ final class TypeScriptPostService {
             }
             let inner = afterKey[afterKey.index(after: openBracket)..<closeBracket]
             return parseArrayElements(String(inner))
-        }
-
-        func findMatchingBracket(in text: String, openAt: String.Index) -> String.Index? {
-            var depth = 0
-            var i = openAt
-            var inString = false
-            var stringDelim: Character = "'"
-            while i < text.endIndex {
-                let c = text[i]
-                if inString {
-                    if c == "\\" {
-                        i = text.index(after: i)
-                        if i < text.endIndex { i = text.index(after: i) }
-                        continue
-                    }
-                    if c == stringDelim {
-                        inString = false
-                    }
-                } else {
-                    if c == "'" || c == "\"" {
-                        inString = true
-                        stringDelim = c
-                    } else if c == "[" {
-                        depth += 1
-                    } else if c == "]" {
-                        depth -= 1
-                        if depth == 0 { return i }
-                    }
-                }
-                i = text.index(after: i)
-            }
-            return nil
-        }
-
-        func parseArrayElements(_ inner: String) -> [String] {
-            var results: [String] = []
-            var current = ""
-            var inString = false
-            var stringDelim: Character = "'"
-            var i = inner.startIndex
-            while i < inner.endIndex {
-                let c = inner[i]
-                if inString {
-                    if c == "\\" {
-                        current.append(c)
-                        i = inner.index(after: i)
-                        if i < inner.endIndex {
-                            current.append(inner[i])
-                        }
-                        i = inner.index(after: i)
-                        continue
-                    }
-                    if c == stringDelim {
-                        inString = false
-                        i = inner.index(after: i)
-                        continue
-                    }
-                    current.append(c)
-                } else {
-                    if c == "'" || c == "\"" {
-                        inString = true
-                        stringDelim = c
-                        current = ""
-                    } else if c == "," {
-                        let trimmed = current.trimmingCharacters(in: .whitespacesAndNewlines)
-                        if !trimmed.isEmpty { results.append(trimmed) }
-                        current = ""
-                    } else {
-                        current.append(c)
-                    }
-                }
-                i = inner.index(after: i)
-            }
-            let trimmed = current.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !trimmed.isEmpty { results.append(trimmed) }
-            return results
         }
 
         func extractSections() -> [TSPSection] {
@@ -258,36 +167,6 @@ final class TypeScriptPostService {
                 searchStart = sectionsInner.index(after: objClose)
             }
             return sections
-        }
-
-        func findMatchingObjectBrace(in text: Substring, openAt: String.Index) -> String.Index? {
-            var depth = 0
-            var i = openAt
-            var inString = false
-            var stringDelim: Character = "'"
-            while i < text.endIndex {
-                let c = text[i]
-                if inString {
-                    if c == "\\" {
-                        i = text.index(after: i)
-                        if i < text.endIndex { i = text.index(after: i) }
-                        continue
-                    }
-                    if c == stringDelim { inString = false }
-                } else {
-                    if c == "'" || c == "\"" {
-                        inString = true
-                        stringDelim = c
-                    } else if c == "{" {
-                        depth += 1
-                    } else if c == "}" {
-                        depth -= 1
-                        if depth == 0 { return i }
-                    }
-                }
-                i = text.index(after: i)
-            }
-            return nil
         }
 
         func extractQuotedStringFromSlice(_ key: String, in slice: String) -> String {
@@ -335,6 +214,130 @@ final class TypeScriptPostService {
             sections: extractSections(),
             takeaways: extractArray("takeaways")
         )
+    }
+
+    // MARK: - Bracket / Brace Matching
+
+    private func findUnescapedClose(in text: String, closing: Character) -> String.Index? {
+        var i = text.startIndex
+        while i < text.endIndex {
+            if text[i] == "\\" {
+                i = text.index(after: i)
+                if i < text.endIndex { i = text.index(after: i) }
+                continue
+            }
+            if text[i] == closing {
+                return i
+            }
+            i = text.index(after: i)
+        }
+        return nil
+    }
+
+    private func findMatchingBracket(in text: String, openAt: String.Index) -> String.Index? {
+        var depth = 0
+        var i = openAt
+        var inString = false
+        var stringDelim: Character = "'"
+        while i < text.endIndex {
+            let c = text[i]
+            if inString {
+                if c == "\\" {
+                    i = text.index(after: i)
+                    if i < text.endIndex { i = text.index(after: i) }
+                    continue
+                }
+                if c == stringDelim {
+                    inString = false
+                }
+            } else {
+                if c == "'" || c == "\"" {
+                    inString = true
+                    stringDelim = c
+                } else if c == "[" {
+                    depth += 1
+                } else if c == "]" {
+                    depth -= 1
+                    if depth == 0 { return i }
+                }
+            }
+            i = text.index(after: i)
+        }
+        return nil
+    }
+
+    private func findMatchingObjectBrace(in text: Substring, openAt: String.Index) -> String.Index? {
+        var depth = 0
+        var i = openAt
+        var inString = false
+        var stringDelim: Character = "'"
+        while i < text.endIndex {
+            let c = text[i]
+            if inString {
+                if c == "\\" {
+                    i = text.index(after: i)
+                    if i < text.endIndex { i = text.index(after: i) }
+                    continue
+                }
+                if c == stringDelim { inString = false }
+            } else {
+                if c == "'" || c == "\"" {
+                    inString = true
+                    stringDelim = c
+                } else if c == "{" {
+                    depth += 1
+                } else if c == "}" {
+                    depth -= 1
+                    if depth == 0 { return i }
+                }
+            }
+            i = text.index(after: i)
+        }
+        return nil
+    }
+
+    private func parseArrayElements(_ inner: String) -> [String] {
+        var results: [String] = []
+        var current = ""
+        var inString = false
+        var stringDelim: Character = "'"
+        var i = inner.startIndex
+        while i < inner.endIndex {
+            let c = inner[i]
+            if inString {
+                if c == "\\" {
+                    current.append(c)
+                    i = inner.index(after: i)
+                    if i < inner.endIndex {
+                        current.append(inner[i])
+                    }
+                    i = inner.index(after: i)
+                    continue
+                }
+                if c == stringDelim {
+                    inString = false
+                    i = inner.index(after: i)
+                    continue
+                }
+                current.append(c)
+            } else {
+                if c == "'" || c == "\"" {
+                    inString = true
+                    stringDelim = c
+                    current = ""
+                } else if c == "," {
+                    let trimmed = current.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !trimmed.isEmpty { results.append(trimmed) }
+                    current = ""
+                } else {
+                    current.append(c)
+                }
+            }
+            i = inner.index(after: i)
+        }
+        let trimmed = current.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty { results.append(trimmed) }
+        return results
     }
 
     // MARK: - Rendering

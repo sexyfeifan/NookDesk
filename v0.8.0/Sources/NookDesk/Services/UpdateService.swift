@@ -29,7 +29,7 @@ enum UpdateServiceError: LocalizedError {
 }
 
 final class UpdateService: @unchecked Sendable {
-    private let apiURL = "https://api.github.com/repos/sexyfeifan/AnimalIslandDesk/releases/latest"
+    private let apiURL = "https://api.github.com/repos/sexyfeifan/NookDesk/releases/latest"
 
     func checkForUpdates(currentVersion: String) async throws -> UpdateInfo? {
         guard let url = URL(string: apiURL) else {
