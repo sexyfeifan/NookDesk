@@ -19,6 +19,11 @@ struct RootView: View {
                 WizardView(viewModel: viewModel)
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .switchToWritingTab)) { _ in
+            withAnimation(NookAnimations.nookEase) {
+                selectedTab = .writing
+            }
+        }
         .alert(item: $viewModel.activeAlert) { item in
             Alert(
                 title: Text(item.title),

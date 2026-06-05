@@ -625,6 +625,15 @@ final class AppViewModel: ObservableObject {
         }
     }
 
+    func syncRemoteForPosts() throws {
+        let output = try publishService.syncWithRemote(
+            project: project,
+            remoteURL: publishRemoteURL,
+            githubToken: preferredGitHubToken
+        )
+        statusText = output.isEmpty ? "已与远端同步。" : output
+    }
+
     func runPublish() {
         runUnifiedPublishWorkflow(operation: "提交并推送")
     }

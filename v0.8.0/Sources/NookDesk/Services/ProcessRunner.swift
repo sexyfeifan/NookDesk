@@ -37,9 +37,13 @@ enum ProcessRunnerError: LocalizedError {
 }
 
 final class ProcessRunner {
-    func enrichedEnvironment(_ extra: [String: String] = [:]) -> [String: String] {
+    func enrichedEnvironment(cwd: URL? = nil, _ extra: [String: String] = [:]) -> [String: String] {
         var env = ProcessInfo.processInfo.environment
-        let extraPaths = "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+        var extraPaths = "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+        if let cwd = cwd {
+            let nodeModulesBin = cwd.appendingPathComponent("node_modules/.bin").path
+            extraPaths = "\(nodeModulesBin):\(extraPaths)"
+        }
         if let existing = env["PATH"] {
             env["PATH"] = "\(extraPaths):\(existing)"
         } else {
@@ -59,9 +63,9 @@ final class ProcessRunner {
         let fm = FileManager.default
         process.currentDirectoryURL = cwd
         if !environment.isEmpty {
-            process.environment = enrichedEnvironment(environment)
+            process.environment = enrichedEnvironment(cwd: cwd, environment)
         } else {
-            process.environment = enrichedEnvironment()
+            process.environment = enrichedEnvironment(cwd: cwd)
         }
 
         if command.contains("/") {

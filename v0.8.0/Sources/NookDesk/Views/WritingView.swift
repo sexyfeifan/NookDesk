@@ -125,6 +125,26 @@ struct WritingView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
 
+            HStack(spacing: 6) {
+                NookButton(.default, size: .small, label: "读取本地") {
+                    loadTSPosts()
+                }
+                NookButton(.default, size: .small, label: "从 GitHub 拉取") {
+                    Task {
+                        do {
+                            try viewModel.syncRemoteForPosts()
+                            loadTSPosts()
+                            tsStatusMessage = "已拉取最新代码并刷新文章列表。"
+                        } catch {
+                            tsStatusMessage = "拉取失败：\(error.localizedDescription)"
+                        }
+                    }
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 6)
+
             NookDivider()
 
             if tsPosts.isEmpty {
@@ -1324,7 +1344,7 @@ private struct WritingSidebarNode: Identifiable {
 
 private enum EditorImplementation: String, CaseIterable, Identifiable {
     case vditor = "Vditor"
-    case native = "兼容模式"
+    case native = "Markdown 模式"
 
     var id: String { rawValue }
 }
