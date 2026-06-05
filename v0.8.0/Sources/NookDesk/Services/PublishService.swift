@@ -278,7 +278,7 @@ final class PublishService {
         let excludes = [
             ":(exclude)NookDesk", ":(exclude)NookDesk/**",
             ":(exclude).nookdesk.local.json",
-            ":(glob,exclude)**/.nookdesk.local.json"
+            ":(exclude)NookDeskStorage", ":(exclude)NookDeskStorage/**"
         ]
         do {
             return try runner.run(command: "git", arguments: base + excludes, in: project.rootURL)

@@ -98,6 +98,7 @@ struct SettingsView: View {
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(.aiTextSecondary)
                     }
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
 
@@ -320,15 +321,10 @@ struct SettingsView: View {
 
     private var advancedSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            advancedGroup("结构检查与修复") {
+            advancedGroup("检查项目状态") {
                 HStack(spacing: 10) {
-                    NookButton(.default, size: .small, label: "检测项目结构") {
+                    NookButton(.default, size: .small, label: "检查项目状态") {
                         viewModel.runStructureCheck()
-                    }
-                    if viewModel.lastStructureReport?.hasMissingItems == true {
-                        NookButton(.danger, size: .small, label: "修复项目结构") {
-                            viewModel.runStructureRepair()
-                        }
                     }
                     Spacer()
                 }
@@ -341,12 +337,12 @@ struct SettingsView: View {
                 }
             }
 
-            advancedGroup("从 GitHub 拉取项目结构") {
+            advancedGroup("从 GitHub 拉取") {
                 VStack(alignment: .leading, spacing: 8) {
                     NookInput("GitHub 仓库 URL", text: $scaffoldRemoteURL)
 
                     HStack(spacing: 10) {
-                        NookButton(.primary, size: .small, label: "拉取项目结构") {
+                        NookButton(.primary, size: .small, label: "拉取项目") {
                             scaffoldResult = nil
                             scaffoldInProgress = true
                             scaffoldLog = []
@@ -392,32 +388,10 @@ struct SettingsView: View {
                 }
             }
 
-            advancedGroup("配置包") {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(viewModel.localConfigBundlePath)
-                        .font(.custom("Nunito-Regular", size: 11))
-                        .foregroundColor(.aiTextMuted)
-                        .textSelection(.enabled)
-
-                    HStack(spacing: 10) {
-                        NookButton(.default, size: .small, label: "导出到项目") {
-                            viewModel.exportConfigBundleToProject()
-                        }
-                        NookButton(.default, size: .small, label: "从项目还原") {
-                            viewModel.importConfigBundleFromProject()
-                        }
-                        Spacer()
-                    }
-                }
-            }
-
-            advancedGroup("Workflow 生成") {
+            advancedGroup("Workflow 管理") {
                 HStack(spacing: 10) {
-                    NookButton(.default, size: .small, label: "生成 Pages Workflow") {
+                    NookButton(.default, size: .small, label: "生成 Workflow") {
                         viewModel.bootstrapGitHubPagesWorkflow()
-                    }
-                    NookButton(.default, size: .small, label: "升级后端") {
-                        viewModel.runBackendUpgrade()
                     }
                     Spacer()
                 }

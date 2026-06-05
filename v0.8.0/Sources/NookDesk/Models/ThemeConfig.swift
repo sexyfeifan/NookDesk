@@ -3,7 +3,7 @@ import Foundation
 struct ThemeConfig: Codable {
     var baseURL: String = "https://example.com/"
     var languageCode: String = "zh-cn"
-    var title: String = "My Hugo Blog"
+    var title: String = "My Blog"
     var theme: String = "github-style"
     var pygmentsCodeFences: Bool = true
     var pygmentsUseClasses: Bool = true

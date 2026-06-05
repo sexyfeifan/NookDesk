@@ -263,7 +263,7 @@ struct WritingView: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.segmented)
-                    .frame(width: 200)
+                    .frame(width: 240)
                 }
 
                 if editorImplementation == .vditor {
@@ -801,7 +801,7 @@ struct WritingView: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.segmented)
-                    .frame(width: 200)
+                    .frame(width: 240)
                 }
 
                 if editorImplementation == .vditor {
@@ -1324,7 +1324,7 @@ private struct WritingSidebarNode: Identifiable {
 
 private enum EditorImplementation: String, CaseIterable, Identifiable {
     case vditor = "Vditor"
-    case native = "兼容"
+    case native = "兼容模式"
 
     var id: String { rawValue }
 }

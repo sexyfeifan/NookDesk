@@ -167,7 +167,7 @@ struct HugoBackend: SSGBuildBackend {
         """
         baseURL = "/"
         languageCode = "zh-cn"
-        title = "My Hugo Site"
+        title = "My Site"
 
         [markup]
           [markup.goldmark]

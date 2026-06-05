@@ -3,22 +3,22 @@ import SwiftUI
 
 struct ProjectSettingsView: View {
     @ObservedObject var viewModel: AppViewModel
-    @State private var expandedHugoLogIDs: Set<UUID> = []
-    @State private var showRawHugoLog = false
+    @State private var expandedLogIDs: Set<UUID> = []
+    @State private var showRawLog = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                ModernCard(title: "项目路径", subtitle: "本地目录与命令工具") {
+                        ModernCard(title: "项目路径", subtitle: "本地目录与命令工具") {
                     VStack(spacing: 10) {
                         SettingRow(
                             key: "project.rootPath",
                             title: "博客根目录",
-                            helpText: "Hugo 项目的根目录，包含 hugo.toml、content、themes 等文件夹。",
+                            helpText: "博客项目的根目录，包含 vite.config.ts、src 等文件夹。",
                             scope: "项目级"
                         ) {
                             HStack {
-                                TextField("例如：/Users/you/Hugo", text: $viewModel.project.rootPath)
+                                TextField("例如：/Users/you/blog", text: $viewModel.project.rootPath)
                                     .textFieldStyle(.roundedBorder)
                                     .onSubmit {
                                         viewModel.setProjectRootPath(viewModel.project.rootPath)
@@ -37,20 +37,20 @@ struct ProjectSettingsView: View {
                         SettingRow(
                             key: "project.buildExecutable",
                             title: "构建工具可执行命令",
-                            helpText: "默认使用 hugo 或 npm，可填写绝对路径以锁定版本。",
+                            helpText: "默认使用 npm，可填写绝对路径以锁定版本。",
                             scope: "构建流程"
                         ) {
-                            TextField("hugo", text: $viewModel.project.buildExecutable)
+                            TextField("npm", text: $viewModel.project.buildExecutable)
                                 .textFieldStyle(.roundedBorder)
                         }
 
                         SettingRow(
                             key: "project.contentSubpath",
                             title: "文章目录",
-                            helpText: "文章保存目录，默认自动识别 content/posts 或 content/post。",
+                            helpText: "文章保存目录，默认自动识别 src/pages/Home。",
                             scope: "内容管理"
                         ) {
-                            TextField("content/post", text: $viewModel.project.contentSubpath)
+                            TextField("src/pages/Home", text: $viewModel.project.contentSubpath)
                                 .textFieldStyle(.roundedBorder)
                         }
                     }
@@ -130,19 +130,11 @@ struct ProjectSettingsView: View {
                 ModernCard(title: "构建工具", subtitle: "本机构建工具常用命令与结构修复") {
                     VStack(alignment: .leading, spacing: 10) {
                         HStack {
-                            Button("检查 后端版本") {
+                            Button("检查构建工具版本") {
                                 viewModel.runBackendVersionCheck()
                             }
-                            Button("升级后端（Homebrew）") {
-                                viewModel.runBackendUpgrade()
-                            }
-                            Button("检测文件结构") {
+                            Button("检查项目状态") {
                                 viewModel.runStructureCheck()
-                            }
-                            if viewModel.lastStructureReport?.hasMissingItems == true {
-                                Button("修复缺失结构") {
-                                    viewModel.runStructureRepair()
-                                }
                             }
                             Spacer()
                         }
@@ -161,8 +153,8 @@ struct ProjectSettingsView: View {
                             Spacer()
                             Button("清空") {
                                 viewModel.clearBuildToolLogs()
-                                expandedHugoLogIDs.removeAll()
-                                showRawHugoLog = false
+                                expandedLogIDs.removeAll()
+                                showRawLog = false
                             }
                             Button("复制") {
                                 let pb = NSPasteboard.general
@@ -172,14 +164,14 @@ struct ProjectSettingsView: View {
                         }
 
                         if viewModel.buildToolLogEntries.isEmpty {
-                            Text("暂无 构建工具日志。执行检查/升级/结构检测后会显示进程与错误信息。")
+                            Text("暂无构建工具日志。执行检查后会显示进程与错误信息。")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         } else {
                             ScrollView {
                                 VStack(alignment: .leading, spacing: 8) {
                                     ForEach(Array(viewModel.buildToolLogEntries.reversed())) { entry in
-                                        DisclosureGroup(isExpanded: bindingForHugoLog(id: entry.id)) {
+                                        DisclosureGroup(isExpanded: bindingForLog(id: entry.id)) {
                                             ScrollView(.horizontal) {
                                                 Text(entry.details.isEmpty ? "无详细输出" : entry.details)
                                                     .font(.system(.caption, design: .monospaced))
@@ -208,7 +200,7 @@ struct ProjectSettingsView: View {
                             .frame(minHeight: 160, maxHeight: 280)
                         }
 
-                        DisclosureGroup("完整原始日志（可复制）", isExpanded: $showRawHugoLog) {
+                        DisclosureGroup("完整原始日志（可复制）", isExpanded: $showRawLog) {
                             ScrollView([.vertical, .horizontal]) {
                                 Text(viewModel.buildToolLog.isEmpty ? "暂无输出" : viewModel.buildToolLog)
                                     .font(.system(.caption, design: .monospaced))
@@ -257,7 +249,7 @@ struct ProjectSettingsView: View {
                 viewModel.runStructureRepair()
             }
         } message: {
-            Text(viewModel.hugoStructurePromptMessage)
+            Text(viewModel.structurePromptMessage)
         }
     }
 
@@ -288,14 +280,14 @@ struct ProjectSettingsView: View {
         }
     }
 
-    private func bindingForHugoLog(id: UUID) -> Binding<Bool> {
+    private func bindingForLog(id: UUID) -> Binding<Bool> {
         Binding(
-            get: { expandedHugoLogIDs.contains(id) },
+            get: { expandedLogIDs.contains(id) },
             set: { isExpanded in
                 if isExpanded {
-                    expandedHugoLogIDs.insert(id)
+                    expandedLogIDs.insert(id)
                 } else {
-                    expandedHugoLogIDs.remove(id)
+                    expandedLogIDs.remove(id)
                 }
             }
         )

@@ -110,7 +110,7 @@ private struct MarkdownFallbackPreviewView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("已启用内置 Markdown 预览（即时）")
                 .font(.subheadline.weight(.semibold))
-            Text("未定位到 Hugo 最终页面时，将自动显示此预览。")
+            Text("未定位到构建产物最终页面时，将自动显示此预览。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             ScrollView {
@@ -120,7 +120,7 @@ private struct MarkdownFallbackPreviewView: View {
             }
             if !candidates.isEmpty {
                 Divider()
-                Text("Hugo 渲染页面候选路径")
+                Text("渲染页面候选路径")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                 ForEach(candidates, id: \.path) { candidate in

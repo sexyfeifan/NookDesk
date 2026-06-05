@@ -83,7 +83,7 @@ struct GitHubActionsService: Sendable {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        request.setValue("HugoDesk", forHTTPHeaderField: "User-Agent")
+        request.setValue("NookDesk", forHTTPHeaderField: "User-Agent")
         if !token.isEmpty {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }

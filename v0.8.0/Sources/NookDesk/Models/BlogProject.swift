@@ -40,7 +40,7 @@ struct BlogProject: Codable {
         contentSubpath = try container.decode(String.self, forKey: .contentSubpath)
         gitRemote = try container.decode(String.self, forKey: .gitRemote)
         publishBranch = try container.decode(String.self, forKey: .publishBranch)
-        backendName = try container.decodeIfPresent(String.self, forKey: .backendName) ?? "Hugo"
+        backendName = try container.decodeIfPresent(String.self, forKey: .backendName) ?? "Vite + React"
     }
 
     func encode(to encoder: Encoder) throws {

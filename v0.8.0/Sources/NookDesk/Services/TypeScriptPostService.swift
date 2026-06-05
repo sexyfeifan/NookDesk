@@ -108,70 +108,230 @@ final class TypeScriptPostService {
     }
 
     private func parseSinglePost(_ block: String) -> TSPPost? {
-        func extractString(_ key: String) -> String {
-            let patterns = [
-                #"\#(key):\s*'([^']*)'"#,
-                #"\#(key):\s*"([^"]*)""#,
-                #"\#(key):\s*`([^`]*)`"#
-            ]
-            for pattern in patterns {
-                if let regex = try? NSRegularExpression(pattern: pattern),
-                   let match = regex.firstMatch(in: block, range: NSRange(location: 0, length: block.utf16.count)),
-                   match.numberOfRanges > 1 {
-                    return (block as NSString).substring(with: match.range(at: 1))
-                }
+        let ns = block as NSString
+
+        func extractQuotedString(_ key: String) -> String {
+            guard let keyRange = block.range(of: "\(key):") else { return "" }
+            let afterKey = String(block[keyRange.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !afterKey.isEmpty else { return "" }
+
+            let delimiter: Character = afterKey.first!
+            let closingDelim: String
+            switch delimiter {
+            case "'": closingDelim = "'"
+            case "\"": closingDelim = "\""
+            case "`": closingDelim = "`"
+            default: return ""
+            }
+
+            let afterOpen = String(afterKey.dropFirst())
+            if let closeIdx = findUnescapedClose(in: afterOpen, closing: closingDelim.first!) {
+                return String(afterOpen[afterOpen.startIndex..<closeIdx])
             }
             return ""
         }
 
+        func findUnescapedClose(in text: String, closing: Character) -> String.Index? {
+            var i = text.startIndex
+            while i < text.endIndex {
+                if text[i] == "\\" {
+                    i = text.index(after: i)
+                    if i < text.endIndex { i = text.index(after: i) }
+                    continue
+                }
+                if text[i] == closing {
+                    return i
+                }
+                i = text.index(after: i)
+            }
+            return nil
+        }
+
         func extractArray(_ key: String) -> [String] {
-            let pattern = #"\#(key):\s*\[([^\]]*)\]"#
-            guard let regex = try? NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators]),
-                  let match = regex.firstMatch(in: block, range: NSRange(location: 0, length: block.utf16.count)),
-                  match.numberOfRanges > 1 else {
+            guard let keyRange = block.range(of: "\(key):") else { return [] }
+            let afterKey = String(block[keyRange.upperBound...])
+            guard let openBracket = afterKey.firstIndex(of: "["),
+                  let closeBracket = findMatchingBracket(in: afterKey, openAt: openBracket) else {
                 return []
             }
-            let inner = (block as NSString).substring(with: match.range(at: 1))
-            return inner.components(separatedBy: ",")
-                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                .map { $0.replacingOccurrences(of: "'", with: "").replacingOccurrences(of: "\"", with: "") }
-                .filter { !$0.isEmpty }
+            let inner = afterKey[afterKey.index(after: openBracket)..<closeBracket]
+            return parseArrayElements(String(inner))
+        }
+
+        func findMatchingBracket(in text: String, openAt: String.Index) -> String.Index? {
+            var depth = 0
+            var i = openAt
+            var inString = false
+            var stringDelim: Character = "'"
+            while i < text.endIndex {
+                let c = text[i]
+                if inString {
+                    if c == "\\" {
+                        i = text.index(after: i)
+                        if i < text.endIndex { i = text.index(after: i) }
+                        continue
+                    }
+                    if c == stringDelim {
+                        inString = false
+                    }
+                } else {
+                    if c == "'" || c == "\"" {
+                        inString = true
+                        stringDelim = c
+                    } else if c == "[" {
+                        depth += 1
+                    } else if c == "]" {
+                        depth -= 1
+                        if depth == 0 { return i }
+                    }
+                }
+                i = text.index(after: i)
+            }
+            return nil
+        }
+
+        func parseArrayElements(_ inner: String) -> [String] {
+            var results: [String] = []
+            var current = ""
+            var inString = false
+            var stringDelim: Character = "'"
+            var i = inner.startIndex
+            while i < inner.endIndex {
+                let c = inner[i]
+                if inString {
+                    if c == "\\" {
+                        current.append(c)
+                        i = inner.index(after: i)
+                        if i < inner.endIndex {
+                            current.append(inner[i])
+                        }
+                        i = inner.index(after: i)
+                        continue
+                    }
+                    if c == stringDelim {
+                        inString = false
+                        i = inner.index(after: i)
+                        continue
+                    }
+                    current.append(c)
+                } else {
+                    if c == "'" || c == "\"" {
+                        inString = true
+                        stringDelim = c
+                        current = ""
+                    } else if c == "," {
+                        let trimmed = current.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !trimmed.isEmpty { results.append(trimmed) }
+                        current = ""
+                    } else {
+                        current.append(c)
+                    }
+                }
+                i = inner.index(after: i)
+            }
+            let trimmed = current.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty { results.append(trimmed) }
+            return results
         }
 
         func extractSections() -> [TSPSection] {
             var sections: [TSPSection] = []
-            let sectionPattern = #"\{\s*heading:\s*'([^']*)',\s*paragraphs:\s*\[([^\]]*)\]\s*\}"#
-            guard let regex = try? NSRegularExpression(pattern: sectionPattern, options: [.dotMatchesLineSeparators]) else {
+            guard let sectionsRange = block.range(of: "sections:") else { return [] }
+            let afterSections = String(block[sectionsRange.upperBound...])
+            guard let openBracket = afterSections.firstIndex(of: "["),
+                  let closeBracket = findMatchingBracket(in: afterSections, openAt: openBracket) else {
                 return []
             }
-            let ns = block as NSString
-            let range = NSRange(location: 0, length: ns.length)
-            let matches = regex.matches(in: block, range: range)
-            for m in matches {
-                let heading = ns.substring(with: m.range(at: 1))
-                let parasRaw = ns.substring(with: m.range(at: 2))
-                let paragraphs = parasRaw.components(separatedBy: "',")
-                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                    .map { $0.replacingOccurrences(of: "'", with: "").replacingOccurrences(of: "\"", with: "") }
-                    .filter { !$0.isEmpty }
-                sections.append(TSPSection(heading: heading, paragraphs: paragraphs))
+            let sectionsInner = afterSections[afterSections.index(after: openBracket)..<closeBracket]
+
+            var searchStart = sectionsInner.startIndex
+            while searchStart < sectionsInner.endIndex {
+                guard let objOpen = sectionsInner[searchStart...].firstIndex(of: "{") else { break }
+                guard let objClose = findMatchingObjectBrace(in: sectionsInner, openAt: objOpen) else { break }
+                let objBody = sectionsInner[sectionsInner.index(after: objOpen)..<objClose]
+
+                let heading = extractQuotedStringFromSlice("heading", in: String(objBody))
+                let paragraphs = extractParagraphsFromSlice(String(objBody))
+                if !heading.isEmpty || !paragraphs.isEmpty {
+                    sections.append(TSPSection(heading: heading, paragraphs: paragraphs))
+                }
+                searchStart = sectionsInner.index(after: objClose)
             }
             return sections
         }
 
-        let id = extractString("id")
+        func findMatchingObjectBrace(in text: Substring, openAt: String.Index) -> String.Index? {
+            var depth = 0
+            var i = openAt
+            var inString = false
+            var stringDelim: Character = "'"
+            while i < text.endIndex {
+                let c = text[i]
+                if inString {
+                    if c == "\\" {
+                        i = text.index(after: i)
+                        if i < text.endIndex { i = text.index(after: i) }
+                        continue
+                    }
+                    if c == stringDelim { inString = false }
+                } else {
+                    if c == "'" || c == "\"" {
+                        inString = true
+                        stringDelim = c
+                    } else if c == "{" {
+                        depth += 1
+                    } else if c == "}" {
+                        depth -= 1
+                        if depth == 0 { return i }
+                    }
+                }
+                i = text.index(after: i)
+            }
+            return nil
+        }
+
+        func extractQuotedStringFromSlice(_ key: String, in slice: String) -> String {
+            guard let keyRange = slice.range(of: "\(key):") else { return "" }
+            let afterKey = String(slice[keyRange.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !afterKey.isEmpty else { return "" }
+            let delimiter: Character = afterKey.first!
+            let closingDelim: Character
+            switch delimiter {
+            case "'": closingDelim = "'"
+            case "\"": closingDelim = "\""
+            default: return ""
+            }
+            let afterOpen = String(afterKey.dropFirst())
+            if let closeIdx = findUnescapedClose(in: afterOpen, closing: closingDelim) {
+                return String(afterOpen[afterOpen.startIndex..<closeIdx])
+            }
+            return ""
+        }
+
+        func extractParagraphsFromSlice(_ slice: String) -> [String] {
+            guard let paraRange = slice.range(of: "paragraphs:") else { return [] }
+            let afterPara = String(slice[paraRange.upperBound...])
+            guard let openBracket = afterPara.firstIndex(of: "["),
+                  let closeBracket = findMatchingBracket(in: afterPara, openAt: openBracket) else {
+                return []
+            }
+            let inner = afterPara[afterPara.index(after: openBracket)..<closeBracket]
+            return parseArrayElements(String(inner))
+        }
+
+        let id = extractQuotedString("id")
         guard !id.isEmpty else { return nil }
 
         return TSPPost(
             id: id,
-            title: extractString("title"),
-            excerpt: extractString("excerpt"),
-            body: extractString("body"),
-            date: extractString("date"),
-            tag: extractString("tag"),
-            color: extractString("color"),
-            readTime: extractString("readTime"),
-            cover: extractString("cover"),
+            title: extractQuotedString("title"),
+            excerpt: extractQuotedString("excerpt"),
+            body: extractQuotedString("body"),
+            date: extractQuotedString("date"),
+            tag: extractQuotedString("tag"),
+            color: extractQuotedString("color"),
+            readTime: extractQuotedString("readTime"),
+            cover: extractQuotedString("cover"),
             sections: extractSections(),
             takeaways: extractArray("takeaways")
         )
@@ -181,6 +341,25 @@ final class TypeScriptPostService {
 
     func renderPostsFile(_ posts: [TSPPost]) -> String {
         var lines: [String] = []
+        lines.append("export type BlogColor =")
+        lines.append("    | \"app-pink\"")
+        lines.append("    | \"purple\"")
+        lines.append("    | \"app-blue\"")
+        lines.append("    | \"app-yellow\"")
+        lines.append("    | \"app-orange\"")
+        lines.append("    | \"app-teal\"")
+        lines.append("    | \"app-green\"")
+        lines.append("    | \"app-red\"")
+        lines.append("    | \"lime-green\"")
+        lines.append("    | \"yellow-green\"")
+        lines.append("    | \"brown\"")
+        lines.append("    | \"warm-peach-pink\";")
+        lines.append("")
+        lines.append("export interface PostSection {")
+        lines.append("    heading: string;")
+        lines.append("    paragraphs: string[];")
+        lines.append("}")
+        lines.append("")
         lines.append("export interface Post {")
         lines.append("  id: string;")
         lines.append("  title: string;")
@@ -188,10 +367,10 @@ final class TypeScriptPostService {
         lines.append("  body: string;")
         lines.append("  date: string;")
         lines.append("  tag: string;")
-        lines.append("  color: string;")
+        lines.append("  color: BlogColor;")
         lines.append("  readTime: string;")
         lines.append("  cover: string;")
-        lines.append("  sections: { heading: string; paragraphs: string[] }[];")
+        lines.append("  sections: PostSection[];")
         lines.append("  takeaways: string[];")
         lines.append("}")
         lines.append("")
@@ -202,7 +381,7 @@ final class TypeScriptPostService {
             lines.append("    id: '\(escapeTS(post.id))',")
             lines.append("    title: '\(escapeTS(post.title))',")
             lines.append("    excerpt: '\(escapeTS(post.excerpt))',")
-            lines.append("    body: `\(post.body)`,")
+            lines.append("    body: `\(escapeBacktick(post.body))`,")
             lines.append("    date: '\(escapeTS(post.date))',")
             lines.append("    tag: '\(escapeTS(post.tag))',")
             lines.append("    color: '\(escapeTS(post.color))',")
@@ -225,6 +404,8 @@ final class TypeScriptPostService {
         }
 
         lines.append("];")
+        lines.append("")
+        lines.append("export const getPostById = (id: string) => posts.find((p) => p.id === id);")
         return lines.joined(separator: "\n")
     }
 
@@ -234,5 +415,12 @@ final class TypeScriptPostService {
             .replacingOccurrences(of: "'", with: "\\'")
             .replacingOccurrences(of: "\n", with: "\\n")
             .replacingOccurrences(of: "\r", with: "\\r")
+    }
+
+    private func escapeBacktick(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "`", with: "\\`")
+            .replacingOccurrences(of: "${", with: "\\${")
     }
 }

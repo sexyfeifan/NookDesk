@@ -78,9 +78,7 @@ final class AppViewModel: ObservableObject {
     private var aiFormattingProgressTask: Task<Void, Never>?
     private static let buildToolOperationNames: Set<String> = [
         "检查构建工具版本",
-        "升级后端",
-        "检测项目结构",
-        "修复项目结构"
+        "检查项目状态"
     ]
 
     init() {
@@ -595,7 +593,7 @@ final class AppViewModel: ObservableObject {
     }
 
     func runStructureCheck() {
-        runTask(operation: "检测项目结构", successStatus: "项目结构检测完成。") {
+        runTask(operation: "检查项目状态", successStatus: "项目状态检查完成。") {
             let report = self.publishService.checkStructure(project: self.project)
             self.lastStructureReport = report
             self.showStructureRepairPrompt = report.hasMissingRequiredItems
@@ -1835,7 +1833,7 @@ final class AppViewModel: ObservableObject {
                 scannedThemes.append(
                     DetectedTheme(
                         name: configured,
-                        sourceDescription: "来自配置（未在 themes/ 下找到目录，可能为 Hugo Modules）",
+                        sourceDescription: "来自配置（未在 themes/ 下找到目录）",
                         supportsGitalk: false,
                         supportsSearch: false,
                         supportsLinks: false,
@@ -2021,7 +2019,7 @@ final class AppViewModel: ObservableObject {
         buildToolLogEntries.map(\.rendered).joined(separator: "\n\n")
     }
 
-    var hugoStructurePromptMessage: String {
+    var structurePromptMessage: String {
         guard let report = lastStructureReport else {
             return "检测到结构缺失，是否自动补齐？"
         }

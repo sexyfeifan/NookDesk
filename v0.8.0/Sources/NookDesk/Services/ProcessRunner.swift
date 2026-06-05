@@ -63,8 +63,8 @@ final class ProcessRunner {
         }
 
         let tempRoot = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
-        let stdoutURL = tempRoot.appendingPathComponent("hugodesk-\(UUID().uuidString)-stdout.log", isDirectory: false)
-        let stderrURL = tempRoot.appendingPathComponent("hugodesk-\(UUID().uuidString)-stderr.log", isDirectory: false)
+        let stdoutURL = tempRoot.appendingPathComponent("nookdesk-\(UUID().uuidString)-stdout.log", isDirectory: false)
+        let stderrURL = tempRoot.appendingPathComponent("nookdesk-\(UUID().uuidString)-stderr.log", isDirectory: false)
         fm.createFile(atPath: stdoutURL.path, contents: Data())
         fm.createFile(atPath: stderrURL.path, contents: Data())
         let stdoutHandle = try FileHandle(forWritingTo: stdoutURL)

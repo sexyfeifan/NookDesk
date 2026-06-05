@@ -54,7 +54,7 @@ struct GitHubPagesService: Sendable {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "GET"
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        request.setValue("HugoDesk", forHTTPHeaderField: "User-Agent")
+        request.setValue("NookDesk", forHTTPHeaderField: "User-Agent")
         request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
 
         let trimmedToken = token.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -94,7 +94,7 @@ struct GitHubPagesService: Sendable {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "PUT"
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        request.setValue("HugoDesk", forHTTPHeaderField: "User-Agent")
+        request.setValue("NookDesk", forHTTPHeaderField: "User-Agent")
         request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
         request.setValue("Bearer \(trimmedToken)", forHTTPHeaderField: "Authorization")
 

@@ -2,7 +2,7 @@
 
 ## TypeScript 文章管理
 
-NookDesk v0.8.0 支持直接管理 `src/pages/Home/posts.ts` 中的文章数据，使用 TypeScript 格式存储。
+NookDesk 支持直接管理 `src/pages/Home/posts.ts` 中的文章数据，使用 TypeScript 格式存储。
 
 ## 页面编辑
 

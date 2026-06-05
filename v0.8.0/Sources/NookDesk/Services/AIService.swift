@@ -242,7 +242,7 @@ struct AIService {
     private func fetchReferenceContext(from url: URL) async -> String? {
         var request = URLRequest(url: url)
         request.timeoutInterval = 15
-        request.setValue("Mozilla/5.0 HugoDesk/1.0", forHTTPHeaderField: "User-Agent")
+        request.setValue("Mozilla/5.0 NookDesk/1.0", forHTTPHeaderField: "User-Agent")
         request.setValue("text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8", forHTTPHeaderField: "Accept")
 
         do {

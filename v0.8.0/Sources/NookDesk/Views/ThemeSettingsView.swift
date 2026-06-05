@@ -73,7 +73,7 @@ struct ThemeSettingsView: View {
                                 }
                             }
                         }
-                        SettingRow(key: "sectionPagesMenu", title: "sectionPagesMenu", helpText: "让 Hugo 自动把 section 页面加入指定菜单，例如 main 或 docs。", scope: "导航") {
+                        SettingRow(key: "sectionPagesMenu", title: "sectionPagesMenu", helpText: "自动把 section 页面加入指定菜单。", scope: "导航") {
                             TextField("例如：main", text: $viewModel.config.sectionPagesMenu)
                                 .textFieldStyle(.roundedBorder)
                         }
@@ -88,7 +88,7 @@ struct ThemeSettingsView: View {
                     }
                 }
 
-                ModernCard(title: "内容结构配置", subtitle: "这里管理 Hugo 的 taxonomies 和多语言 contentDir。它们直接决定写作页的分类法字段和工作区切换能力。") {
+                ModernCard(title: "内容结构配置", subtitle: "管理分类法和多语言 contentDir，决定写作页的分类法字段和工作区切换能力。") {
                     VStack(alignment: .leading, spacing: 14) {
                         VStack(alignment: .leading, spacing: 10) {
                             HStack {
@@ -224,7 +224,7 @@ struct ThemeSettingsView: View {
                             TextField("", text: $viewModel.config.params.url).textFieldStyle(.roundedBorder)
                         }
                         SettingRow(key: "params.keywords", title: "默认关键词", helpText: "文章没有关键词时使用此项作为 fallback。", scope: "SEO") {
-                            TextField("例如：hugo, blog", text: $viewModel.config.params.keywords).textFieldStyle(.roundedBorder)
+                            TextField("blog, tech, tools", text: $viewModel.config.params.keywords).textFieldStyle(.roundedBorder)
                         }
                         SettingRow(key: "params.location", title: "地理位置", helpText: "侧栏位置字段。", scope: "侧栏") {
                             TextField("", text: $viewModel.config.params.location).textFieldStyle(.roundedBorder)
@@ -294,7 +294,7 @@ struct ThemeSettingsView: View {
                         SettingRow(key: "frontmatter.lastmod", title: "根据文件更新时间追踪 lastmod", helpText: "使用 :fileModTime 自动生成文章最后更新时间。", scope: "文章元数据") {
                             Toggle("", isOn: $viewModel.config.frontmatterTrackLastmod).labelsHidden()
                         }
-                        SettingRow(key: "services.googleAnalytics.ID", title: "Google Analytics ID", helpText: "生产环境 HUGO_ENV=production 时生效。", scope: "统计") {
+                        SettingRow(key: "services.googleAnalytics.ID", title: "Google Analytics ID", helpText: "Google Analytics 跟踪 ID。", scope: "统计") {
                             TextField("", text: $viewModel.config.googleAnalyticsID).textFieldStyle(.roundedBorder)
                         }
 
@@ -430,7 +430,7 @@ struct ThemeSettingsView: View {
                 }
 
                 HStack {
-                    Button("从 hugo.toml 重新读取") {
+                    Button("从配置重新读取") {
                         viewModel.loadAll()
                         syncTextInputs()
                     }
