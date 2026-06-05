@@ -50,6 +50,23 @@ enum NookColor: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    var blogValue: String {
+        var result = ""
+        for char in rawValue {
+            if char.isUppercase {
+                if !result.isEmpty { result += "-" }
+                result += char.lowercased()
+            } else {
+                result.append(char)
+            }
+        }
+        return result
+    }
+
+    static func fromBlogValue(_ bv: String) -> NookColor {
+        allCases.first { $0.blogValue == bv } ?? .appBlue
+    }
+
     var color: Color {
         switch self {
         case .appPink:       return Color(red: 0.973, green: 0.651, blue: 0.698)

@@ -140,6 +140,18 @@ struct WritingView: View {
                         }
                     }
                 }
+                NookButton(.default, size: .small, label: "从 Git 恢复") {
+                    do {
+                        tsPosts = try tsPostService.restoreFromGit(project: viewModel.project)
+                        if let first = tsPosts.first {
+                            selectedTSPostID = first.id
+                            editingTSPost = first
+                        }
+                        tsStatusMessage = "已从 Git 恢复 \(tsPosts.count) 篇文章。"
+                    } catch {
+                        tsStatusMessage = "恢复失败：\(error.localizedDescription)"
+                    }
+                }
                 Spacer()
             }
             .padding(.horizontal, 12)
@@ -313,7 +325,7 @@ struct WritingView: View {
                     }
                     NookButton(.default, size: .small, label: "保存并构建") {
                         saveSelectedTSPost()
-                        viewModel.runBuild()
+                        ensureNodeModulesThenBuild()
                     }
                     NookButton(.default, size: .small, label: "AI 写作") {
                         if editorImplementation == .vditor { vditorBridge.rememberSelection() }
@@ -360,12 +372,12 @@ struct WritingView: View {
                     }
                     tsInspectorField("颜色") {
                         Picker("", selection: bindingTSColor()) {
-                            ForEach(NookColor.allCases) { nc in
+                            ForEach(NookColor.allCases.filter { $0 != .nookDefault }) { nc in
                                 HStack(spacing: 6) {
                                     Circle().fill(nc.color).frame(width: 12, height: 12)
-                                    Text(nc.rawValue)
+                                    Text(nc.blogValue)
                                 }
-                                .tag(nc.rawValue)
+                                .tag(nc.blogValue)
                             }
                         }
                         .labelsHidden()
@@ -602,9 +614,30 @@ struct WritingView: View {
         guard let post = editingTSPost else { return }
         do {
             tsPosts = try tsPostService.updatePost(post, in: viewModel.project)
+            if let updated = tsPosts.first(where: { $0.id == post.id }) {
+                editingTSPost = updated
+            }
             tsStatusMessage = "已保存：\(post.title)"
         } catch {
             tsStatusMessage = "保存失败：\(error.localizedDescription)"
+        }
+    }
+
+    private func ensureNodeModulesThenBuild() {
+        let nodeModulesURL = viewModel.project.rootURL.appendingPathComponent("node_modules", isDirectory: true)
+        if !FileManager.default.fileExists(atPath: nodeModulesURL.path) {
+            Task {
+                do {
+                    let runner = ProcessRunner()
+                    _ = try runner.run(command: "npm", arguments: ["install"], in: viewModel.project.rootURL)
+                    tsStatusMessage = "依赖安装完成，开始构建…"
+                    viewModel.runBuild()
+                } catch {
+                    tsStatusMessage = "npm install 失败：\(error.localizedDescription)"
+                }
+            }
+        } else {
+            viewModel.runBuild()
         }
     }
 

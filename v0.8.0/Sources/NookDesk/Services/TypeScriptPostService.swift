@@ -72,12 +72,18 @@ final class TypeScriptPostService {
             body: "",
             date: dateStr,
             tag: "",
-            color: "bg-blue",
-            readTime: "1 min read",
+            color: "app-blue",
+            readTime: "5 分钟",
             cover: "",
             sections: [],
             takeaways: []
         )
+    }
+
+    func restoreFromGit(project: BlogProject) throws -> [TSPPost] {
+        let runner = ProcessRunner()
+        _ = try runner.run(command: "git", arguments: ["checkout", "HEAD", "--", "src/pages/Home/posts.ts"], in: project.rootURL)
+        return try loadPosts(from: project)
     }
 
     // MARK: - Parsing
