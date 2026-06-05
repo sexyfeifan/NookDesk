@@ -2,7 +2,7 @@ import Foundation
 
 final class TypeScriptPostService {
 
-    struct TSPPost {
+    struct TSPPost: Identifiable {
         var id: String
         var title: String
         var excerpt: String

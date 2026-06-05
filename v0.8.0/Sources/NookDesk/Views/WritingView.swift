@@ -15,7 +15,47 @@ struct WritingView: View {
     @State private var aiWritingSourceText = ""
     @State private var selectedWorkspacePickerCode = ""
 
+    private let tsPostService = TypeScriptPostService()
+    @State private var tsPosts: [TypeScriptPostService.TSPPost] = []
+    @State private var selectedTSPostID: String?
+    @State private var editingTSPost: TypeScriptPostService.TSPPost?
+    @State private var tsStatusMessage = ""
+    @State private var showTSDeleteConfirm = false
+    @State private var newTSTitle = ""
+
+    private var isViteBackend: Bool {
+        viewModel.project.backendName.contains("Vite")
+    }
+
     var body: some View {
+        if isViteBackend {
+            tsWritingBody
+        } else {
+            hugoWritingBody
+        }
+    }
+
+    private var tsWritingBody: some View {
+        NavigationSplitView {
+            tsSidebarContent
+                .navigationTitle("文章")
+                .navigationSplitViewColumnWidth(min: 220, ideal: 280, max: 340)
+        } detail: {
+            tsDetailContent
+                .onAppear { loadTSPosts() }
+                .alert("确认删除？", isPresented: $showTSDeleteConfirm) {
+                    Button("删除", role: .destructive) { deleteSelectedTSPost() }
+                    Button("取消", role: .cancel) {}
+                } message: {
+                    Text(editingTSPost?.title ?? "")
+                }
+                .sheet(isPresented: $showingAIWritingSheet) {
+                    aiWritingSheet
+                }
+        }
+    }
+
+    private var hugoWritingBody: some View {
         NavigationSplitView(columnVisibility: editorColumnVisibility) {
             sidebarContent
                 .navigationTitle("内容")
@@ -58,6 +98,508 @@ struct WritingView: View {
                 .sheet(isPresented: $showingAIWritingSheet) {
                     aiWritingSheet
                 }
+        }
+    }
+
+    // MARK: - TypeScript Post Sidebar
+
+    private var tsSidebarContent: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("文章列表")
+                    .font(.custom("Nunito-Bold", size: 13))
+                    .foregroundColor(.aiTextSecondary)
+                Spacer()
+                NookButton(.primary, size: .small, label: "+ 新文章") {
+                    let newPost = tsPostService.makeNewPost(title: "未命名文章")
+                    do {
+                        tsPosts = try tsPostService.addPost(newPost, to: viewModel.project)
+                        selectedTSPostID = newPost.id
+                        editingTSPost = newPost
+                        tsStatusMessage = "已创建新文章。"
+                    } catch {
+                        tsStatusMessage = "创建失败：\(error.localizedDescription)"
+                    }
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+
+            NookDivider()
+
+            if tsPosts.isEmpty {
+                NookEmptyState(
+                    icon: .design,
+                    title: "还没有文章",
+                    subtitle: "点击上方按钮创建第一篇文章"
+                )
+            } else {
+                List(tsPosts, selection: $selectedTSPostID) { post in
+                    Button {
+                        selectedTSPostID = post.id
+                        editingTSPost = post
+                    } label: {
+                        HStack(spacing: 8) {
+                            Text(post.cover.isEmpty ? "📄" : post.cover)
+                                .font(.system(size: 16))
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(post.title.isEmpty ? "未命名" : post.title)
+                                    .font(.custom("Nunito-SemiBold", size: 13))
+                                    .foregroundColor(post.id == selectedTSPostID ? .aiTextHeader : .aiTextBody)
+                                    .lineLimit(1)
+                                HStack(spacing: 6) {
+                                    Text(post.date)
+                                        .font(.custom("Nunito-Regular", size: 10))
+                                    if !post.tag.isEmpty {
+                                        Text("#\(post.tag)")
+                                            .font(.custom("Nunito-Regular", size: 10))
+                                    }
+                                }
+                                .foregroundColor(.aiTextMuted)
+                            }
+                            Spacer()
+                        }
+                        .padding(.vertical, 4)
+                        .padding(.horizontal, 6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(post.id == selectedTSPostID ? Color.aiPrimary.opacity(0.12) : Color.clear)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .tag(post.id)
+                }
+            }
+
+            Spacer()
+
+            if !tsStatusMessage.isEmpty {
+                Text(tsStatusMessage)
+                    .font(.custom("Nunito-Regular", size: 11))
+                    .foregroundColor(.aiTextMuted)
+                    .padding(8)
+                    .lineLimit(2)
+            }
+        }
+    }
+
+    // MARK: - TypeScript Post Detail
+
+    private var tsDetailContent: some View {
+        ScrollView {
+            VStack(spacing: 12) {
+                tsNewPostCard
+                NookWaveDivider()
+
+                if let post = editingTSPost {
+                    GeometryReader { proxy in
+                        let compact = proxy.size.width < 1100
+                        if compact {
+                            VStack(spacing: 12) {
+                                tsEditorArea(post: post)
+                                tsInspector(post: post)
+                            }
+                        } else {
+                            HStack(alignment: .top, spacing: 12) {
+                                tsEditorArea(post: post)
+                                    .frame(minWidth: 600, maxWidth: .infinity, alignment: .topLeading)
+                                tsInspector(post: post)
+                                    .frame(width: min(max(proxy.size.width * 0.3, 320), 400), alignment: .topLeading)
+                            }
+                        }
+                    }
+                    .frame(minHeight: 600)
+                } else {
+                    NookEmptyState(
+                        icon: .design,
+                        title: "选择一篇文章",
+                        subtitle: "从左侧列表选择或创建新文章"
+                    )
+                }
+            }
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+    }
+
+    private var tsNewPostCard: some View {
+        NookCard(color: .appBlue) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("新建文章")
+                    .font(.custom("Nunito-Bold", size: 16))
+                    .foregroundColor(.aiTextHeader)
+                HStack(spacing: 10) {
+                    NookInput("文章标题", text: $newTSTitle)
+                    NookButton(.primary, size: .small, label: "创建") {
+                        let title = newTSTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let newPost = tsPostService.makeNewPost(title: title.isEmpty ? "未命名文章" : title)
+                        do {
+                            tsPosts = try tsPostService.addPost(newPost, to: viewModel.project)
+                            selectedTSPostID = newPost.id
+                            editingTSPost = newPost
+                            newTSTitle = ""
+                            tsStatusMessage = "已创建：\(newPost.title)"
+                        } catch {
+                            tsStatusMessage = "创建失败：\(error.localizedDescription)"
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func tsEditorArea(post: TypeScriptPostService.TSPPost) -> some View {
+        NookCard {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text("正文编辑")
+                        .font(.custom("Nunito-Bold", size: 16))
+                        .foregroundColor(.aiTextHeader)
+                    Spacer()
+                    Picker("", selection: $editorImplementation) {
+                        ForEach(EditorImplementation.allCases) { impl in
+                            Text(impl.rawValue).tag(impl)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .frame(width: 200)
+                }
+
+                if editorImplementation == .vditor {
+                    VditorEditorView(
+                        text: bindingTSBody(),
+                        statusMessage: $tsStatusMessage,
+                        bridge: vditorBridge,
+                        onRequestImageImport: importImageFromPanel
+                    )
+                    .frame(minHeight: 480)
+                    .background(Color.aiBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                } else {
+                    TextEditor(text: bindingTSBody())
+                        .font(.system(.body, design: .monospaced))
+                        .frame(minHeight: 480)
+                        .padding(8)
+                        .background(Color.aiBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+
+                NookDivider()
+
+                HStack(spacing: 10) {
+                    NookButton(.primary, size: .small, label: "保存") {
+                        saveSelectedTSPost()
+                    }
+                    NookButton(.default, size: .small, label: "保存并构建") {
+                        saveSelectedTSPost()
+                        viewModel.runBuild()
+                    }
+                    NookButton(.default, size: .small, label: "AI 写作") {
+                        if editorImplementation == .vditor { vditorBridge.rememberSelection() }
+                        viewModel.loadAIWritingHistory()
+                        showingAIWritingSheet = true
+                    }
+                    Spacer()
+                    NookButton(.danger, size: .small, label: "删除") {
+                        showTSDeleteConfirm = true
+                    }
+                    Text("posts.ts")
+                        .font(.custom("Nunito-Regular", size: 11))
+                        .foregroundColor(.aiTextMuted)
+                }
+            }
+        }
+    }
+
+    private func tsInspector(post: TypeScriptPostService.TSPPost) -> some View {
+        NookCard(color: .appYellow) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("文章属性")
+                    .font(.custom("Nunito-Bold", size: 16))
+                    .foregroundColor(.aiTextHeader)
+                NookDivider()
+
+                VStack(alignment: .leading, spacing: 10) {
+                    tsInspectorField("标题") {
+                        TextField("标题", text: bindingTSTitle())
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    tsInspectorField("摘要") {
+                        TextField("摘要", text: bindingTSExcerpt(), axis: .vertical)
+                            .lineLimit(2...4)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    tsInspectorField("日期") {
+                        TextField("yyyy-MM-dd", text: bindingTSDate())
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    tsInspectorField("标签") {
+                        TextField("标签", text: bindingTSTag())
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    tsInspectorField("颜色") {
+                        Picker("", selection: bindingTSColor()) {
+                            ForEach(NookColor.allCases) { nc in
+                                HStack(spacing: 6) {
+                                    Circle().fill(nc.color).frame(width: 12, height: 12)
+                                    Text(nc.rawValue)
+                                }
+                                .tag(nc.rawValue)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                    }
+                    tsInspectorField("阅读时间") {
+                        TextField("如: 5 分钟", text: bindingTSReadTime())
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    tsInspectorField("封面图标") {
+                        TextField("emoji", text: bindingTSCover())
+                            .textFieldStyle(.roundedBorder)
+                    }
+                }
+
+                NookDivider()
+                tsSectionsEditor
+                NookDivider()
+                tsTakeawaysEditor
+            }
+        }
+    }
+
+    private var tsSectionsEditor: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("章节")
+                    .font(.custom("Nunito-SemiBold", size: 13))
+                    .foregroundColor(.aiTextHeader)
+                Spacer()
+                NookButton(.default, size: .small, label: "+ 章节") {
+                    guard var post = editingTSPost else { return }
+                    post.sections.append(TypeScriptPostService.TSPSection(heading: "新章节", paragraphs: [""]))
+                    editingTSPost = post
+                }
+            }
+
+            if let post = editingTSPost {
+                ForEach(Array(post.sections.enumerated()), id: \.offset) { idx, section in
+                    NookCard(color: .appTeal) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                TextField("章节标题", text: Binding(
+                                    get: { section.heading },
+                                    set: { newHeading in
+                                        guard var p = editingTSPost else { return }
+                                        p.sections[idx].heading = newHeading
+                                        editingTSPost = p
+                                    }
+                                ))
+                                .textFieldStyle(.roundedBorder)
+                                .font(.custom("Nunito-SemiBold", size: 13))
+
+                                Spacer()
+                                Button {
+                                    guard var p = editingTSPost else { return }
+                                    p.sections.remove(at: idx)
+                                    editingTSPost = p
+                                } label: {
+                                    Image(systemName: "trash")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.aiError)
+                                }
+                                .buttonStyle(.plain)
+                            }
+
+                            ForEach(Array(section.paragraphs.enumerated()), id: \.offset) { pIdx, para in
+                                HStack(alignment: .top) {
+                                    TextField("段落", text: Binding(
+                                        get: { para },
+                                        set: { newVal in
+                                            guard var p = editingTSPost else { return }
+                                            p.sections[idx].paragraphs[pIdx] = newVal
+                                            editingTSPost = p
+                                        }
+                                    ), axis: .vertical)
+                                    .textFieldStyle(.roundedBorder)
+                                    .lineLimit(2...6)
+                                    .font(.custom("Nunito-Regular", size: 12))
+
+                                    Button {
+                                        guard var p = editingTSPost else { return }
+                                        p.sections[idx].paragraphs.remove(at: pIdx)
+                                        editingTSPost = p
+                                    } label: {
+                                        Image(systemName: "minus.circle")
+                                            .font(.system(size: 11))
+                                            .foregroundColor(.aiError)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+
+                            NookButton(.default, size: .small, label: "+ 段落") {
+                                guard var p = editingTSPost else { return }
+                                p.sections[idx].paragraphs.append("")
+                                editingTSPost = p
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var tsTakeawaysEditor: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("要点")
+                    .font(.custom("Nunito-SemiBold", size: 13))
+                    .foregroundColor(.aiTextHeader)
+                Spacer()
+                NookButton(.default, size: .small, label: "+ 要点") {
+                    guard var post = editingTSPost else { return }
+                    post.takeaways.append("")
+                    editingTSPost = post
+                }
+            }
+
+            if let post = editingTSPost {
+                ForEach(Array(post.takeaways.enumerated()), id: \.offset) { idx, takeaway in
+                    HStack {
+                        TextField("要点 \(idx + 1)", text: Binding(
+                            get: { takeaway },
+                            set: { newVal in
+                                guard var p = editingTSPost else { return }
+                                p.takeaways[idx] = newVal
+                                editingTSPost = p
+                            }
+                        ))
+                        .textFieldStyle(.roundedBorder)
+                        .font(.custom("Nunito-Regular", size: 12))
+
+                        Button {
+                            guard var p = editingTSPost else { return }
+                            p.takeaways.remove(at: idx)
+                            editingTSPost = p
+                        } label: {
+                            Image(systemName: "minus.circle")
+                                .font(.system(size: 11))
+                                .foregroundColor(.aiError)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
+    private func tsInspectorField<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.custom("Nunito-SemiBold", size: 12))
+                .foregroundColor(.aiTextSecondary)
+            content()
+        }
+    }
+
+    // MARK: - TS Bindings
+
+    private func bindingTSBody() -> Binding<String> {
+        Binding(
+            get: { editingTSPost?.body ?? "" },
+            set: { newVal in editingTSPost?.body = newVal }
+        )
+    }
+
+    private func bindingTSTitle() -> Binding<String> {
+        Binding(
+            get: { editingTSPost?.title ?? "" },
+            set: { newVal in editingTSPost?.title = newVal }
+        )
+    }
+
+    private func bindingTSExcerpt() -> Binding<String> {
+        Binding(
+            get: { editingTSPost?.excerpt ?? "" },
+            set: { newVal in editingTSPost?.excerpt = newVal }
+        )
+    }
+
+    private func bindingTSDate() -> Binding<String> {
+        Binding(
+            get: { editingTSPost?.date ?? "" },
+            set: { newVal in editingTSPost?.date = newVal }
+        )
+    }
+
+    private func bindingTSTag() -> Binding<String> {
+        Binding(
+            get: { editingTSPost?.tag ?? "" },
+            set: { newVal in editingTSPost?.tag = newVal }
+        )
+    }
+
+    private func bindingTSColor() -> Binding<String> {
+        Binding(
+            get: { editingTSPost?.color ?? "app-blue" },
+            set: { newVal in editingTSPost?.color = newVal }
+        )
+    }
+
+    private func bindingTSReadTime() -> Binding<String> {
+        Binding(
+            get: { editingTSPost?.readTime ?? "" },
+            set: { newVal in editingTSPost?.readTime = newVal }
+        )
+    }
+
+    private func bindingTSCover() -> Binding<String> {
+        Binding(
+            get: { editingTSPost?.cover ?? "" },
+            set: { newVal in editingTSPost?.cover = newVal }
+        )
+    }
+
+    // MARK: - TS Actions
+
+    private func loadTSPosts() {
+        do {
+            tsPosts = try tsPostService.loadPosts(from: viewModel.project)
+            if let first = tsPosts.first, selectedTSPostID == nil {
+                selectedTSPostID = first.id
+                editingTSPost = first
+            }
+            tsStatusMessage = "已加载 \(tsPosts.count) 篇文章。"
+        } catch {
+            tsPosts = []
+            tsStatusMessage = "加载失败：\(error.localizedDescription)"
+        }
+    }
+
+    private func saveSelectedTSPost() {
+        guard let post = editingTSPost else { return }
+        do {
+            tsPosts = try tsPostService.updatePost(post, in: viewModel.project)
+            tsStatusMessage = "已保存：\(post.title)"
+        } catch {
+            tsStatusMessage = "保存失败：\(error.localizedDescription)"
+        }
+    }
+
+    private func deleteSelectedTSPost() {
+        guard let id = editingTSPost?.id else { return }
+        do {
+            tsPosts = try tsPostService.deletePost(id: id, in: viewModel.project)
+            editingTSPost = nil
+            selectedTSPostID = tsPosts.first?.id
+            if let first = tsPosts.first {
+                editingTSPost = first
+            }
+            tsStatusMessage = "已删除文章。"
+        } catch {
+            tsStatusMessage = "删除失败：\(error.localizedDescription)"
         }
     }
 

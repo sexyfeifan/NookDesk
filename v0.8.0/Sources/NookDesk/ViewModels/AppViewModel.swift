@@ -2041,20 +2041,64 @@ final class AppViewModel: ObservableObject {
 
     func preflightChecks() -> [PublishCheck] {
         var checks: [PublishCheck] = []
+        let fm = FileManager.default
+        let root = project.rootURL
 
-        let detectedConfig = project.detectedConfigRelativePath
-        let configExists = detectedConfig != nil
+        let packageJsonExists = fm.fileExists(atPath: root.appendingPathComponent("package.json").path)
         checks.append(
             PublishCheck(
-                title: "项目配置文件",
-                detail: configExists
-                    ? "已找到 \(detectedConfig ?? "配置文件")。"
-                    : "未找到项目配置文件。",
-                level: configExists ? .ok : .error
+                title: "package.json",
+                detail: packageJsonExists ? "已找到 package.json。" : "未找到 package.json。",
+                level: packageJsonExists ? .ok : .error
             )
         )
 
-        let localBundleExists = FileManager.default.fileExists(atPath: project.localConfigBundleURL.path)
+        let viteConfigExists = project.detectedConfigRelativePath != nil
+        checks.append(
+            PublishCheck(
+                title: "Vite 配置",
+                detail: viteConfigExists
+                    ? "已找到 \(project.detectedConfigRelativePath ?? "vite.config.ts")。"
+                    : "未找到 vite.config.ts。",
+                level: viteConfigExists ? .ok : .error
+            )
+        )
+
+        let postsTsPath = project.contentURL.appendingPathComponent("posts.ts").path
+        let postsTsExists = fm.fileExists(atPath: postsTsPath)
+        checks.append(
+            PublishCheck(
+                title: "posts.ts 文章数据",
+                detail: postsTsExists ? "已找到 posts.ts。" : "未找到 posts.ts（\(project.contentSubpath)/posts.ts）。",
+                level: postsTsExists ? .ok : .error
+            )
+        )
+
+        let nodeModulesExists: Bool = {
+            var isDir = ObjCBool(false)
+            return fm.fileExists(atPath: root.appendingPathComponent("node_modules").path, isDirectory: &isDir) && isDir.boolValue
+        }()
+        checks.append(
+            PublishCheck(
+                title: "node_modules",
+                detail: nodeModulesExists ? "已安装依赖。" : "未找到 node_modules，请先运行 npm install。",
+                level: nodeModulesExists ? .ok : .error
+            )
+        )
+
+        let workflowExists = publishService.hasGitHubPagesWorkflow(project: project)
+        let workflowFileName = project.backend.workflowFileName
+        checks.append(
+            PublishCheck(
+                title: "Deploy Workflow",
+                detail: workflowExists
+                    ? "已检测到 .github/workflows/\(workflowFileName)。"
+                    : "未检测到 .github/workflows/\(workflowFileName)。点击「生成 Pages Workflow」自动创建。",
+                level: workflowExists ? .ok : .error
+            )
+        )
+
+        let localBundleExists = fm.fileExists(atPath: project.localConfigBundleURL.path)
         checks.append(
             PublishCheck(
                 title: "本地配置包",
@@ -2066,7 +2110,7 @@ final class AppViewModel: ObservableObject {
         let remote = publishRemoteURL.trimmingCharacters(in: .whitespacesAndNewlines)
         checks.append(
             PublishCheck(
-                title: "推送地址",
+                title: "Git 远程地址",
                 detail: remote.isEmpty ? "未配置远程仓库 URL。请在设置中填写 GitHub 仓库地址。" : remote,
                 level: remote.isEmpty ? .error : .ok
             )
@@ -2128,18 +2172,6 @@ final class AppViewModel: ObservableObject {
                 )
             )
         }
-
-        let workflowExists = publishService.hasGitHubPagesWorkflow(project: project)
-        let workflowFileName = project.backend.workflowFileName
-        checks.append(
-            PublishCheck(
-                title: "Pages Workflow",
-                detail: workflowExists
-                    ? "已检测到 .github/workflows/\(workflowFileName)。"
-                    : "未检测到 .github/workflows/\(workflowFileName)。点击「生成 Pages Workflow」自动创建。",
-                level: workflowExists ? .ok : .error
-            )
-        )
 
         let postCount = posts.count
         checks.append(
