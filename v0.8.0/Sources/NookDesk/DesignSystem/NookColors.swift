@@ -51,6 +51,7 @@ enum NookColor: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 
     var blogValue: String {
+        if self == .nookDefault { return "app-blue" }
         var result = ""
         for char in rawValue {
             if char.isUppercase {

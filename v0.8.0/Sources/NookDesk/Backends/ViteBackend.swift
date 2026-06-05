@@ -168,6 +168,8 @@ struct ViteBackend: SSGBuildBackend {
 
     private func resolveNpm(cwd: URL) -> String? {
         let fm = FileManager.default
+        let localNpm = cwd.appendingPathComponent("node_modules/.bin/npm").path
+        if fm.isExecutableFile(atPath: localNpm) { return localNpm }
         let roots = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"]
         for root in roots {
             let path = "\(root)/npm"

@@ -15,12 +15,10 @@ final class AppViewModel: ObservableObject {
     @Published var posts: [BlogPost] = []
     @Published var selectedPostID: String?
     @Published var editorPost: BlogPost
-    @Published var editorMode: EditorMode = .markdown
     @Published var newPostTitle: String = ""
     @Published var newPostFileName: String = "new-post.md"
     @Published var newPostSectionPath: String = ""
     @Published var newPostFrontMatterFormat: FrontMatterFormat = .toml
-    @Published var availableArchetypes: [String] = []
     @Published var frontMatterEditorMode: FrontMatterEditorMode = .structured
     @Published var imageStorageMode: ImageStorageMode = .automatic
     @Published var languageWorkspaces: [LanguageProfile] = []
@@ -216,7 +214,6 @@ final class AppViewModel: ObservableObject {
             refreshDetectedThemes()
             refreshLanguageWorkspaces()
             refreshShortcodes()
-            availableArchetypes = []
             try reloadPosts(selectFirstIfNeeded: true)
             refreshContentDiagnostics()
             loadAIWritingHistory()
@@ -1150,7 +1147,7 @@ final class AppViewModel: ObservableObject {
     }
 
     private func saveLocalConfigBundle() throws {
-        let bundle = makeConfigBundleSnapshot()
+        let bundle = makeConfigBundleSnapshot().sanitized()
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
@@ -1185,7 +1182,6 @@ final class AppViewModel: ObservableObject {
         refreshDetectedThemes()
         refreshLanguageWorkspaces()
         refreshShortcodes()
-        availableArchetypes = []
         try reloadPosts(selectFirstIfNeeded: true)
 
         appendPublishLog(
@@ -2402,9 +2398,4 @@ struct AIWritingMessage: Identifiable, Codable {
     }
 }
 
-enum EditorMode: String, CaseIterable, Identifiable {
-    case markdown = "Markdown"
-    case richText = "富文本"
 
-    var id: String { rawValue }
-}

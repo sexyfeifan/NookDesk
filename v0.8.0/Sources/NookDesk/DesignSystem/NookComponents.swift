@@ -539,6 +539,7 @@ struct NookTypewriterText: View {
     let typingSpeed: TimeInterval
     @State private var displayedText = ""
     @State private var showCursor = true
+    @State private var animationTask: Task<Void, Never>?
 
     init(_ text: String, typingSpeed: TimeInterval = 0.06) {
         self.text = text
@@ -563,11 +564,19 @@ struct NookTypewriterText: View {
         .onAppear {
             showCursor = true
             displayedText = ""
-            for (index, char) in text.enumerated() {
-                DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * typingSpeed) {
+            animationTask?.cancel()
+            animationTask = Task { @MainActor in
+                for (index, char) in text.enumerated() {
+                    guard !Task.isCancelled else { break }
+                    try? await Task.sleep(nanoseconds: UInt64(typingSpeed * 1_000_000_000) * UInt64(index == 0 ? 0 : 1))
+                    guard !Task.isCancelled else { break }
                     displayedText.append(char)
                 }
             }
+        }
+        .onDisappear {
+            animationTask?.cancel()
+            animationTask = nil
         }
     }
 }

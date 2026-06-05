@@ -71,10 +71,10 @@ final class TypeScriptPostService {
             excerpt: "",
             body: "",
             date: dateStr,
-            tag: "",
+            tag: "Blog",
             color: "app-blue",
             readTime: "5 分钟",
-            cover: "",
+            cover: "📝",
             sections: [],
             takeaways: []
         )

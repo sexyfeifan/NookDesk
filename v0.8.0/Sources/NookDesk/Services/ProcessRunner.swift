@@ -97,8 +97,6 @@ final class ProcessRunner {
         process.waitUntilExit()
         try stdoutHandle.synchronize()
         try stderrHandle.synchronize()
-        try stdoutHandle.close()
-        try stderrHandle.close()
         let finishedAt = Date()
 
         let stdoutData = try Data(contentsOf: stdoutURL)

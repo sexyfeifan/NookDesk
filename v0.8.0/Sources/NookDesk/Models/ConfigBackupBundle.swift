@@ -66,4 +66,12 @@ struct ConfigBackupBundle: Codable {
     private enum LegacyCodingKeys: String, CodingKey {
         case githubToken
     }
+
+    func sanitized() -> ConfigBackupBundle {
+        var copy = self
+        copy.githubTokenClassic = githubTokenClassic.isEmpty ? "" : "•••••"
+        copy.githubTokenFineGrained = githubTokenFineGrained.isEmpty ? "" : "•••••"
+        copy.aiAPIKey = aiAPIKey.isEmpty ? "" : "•••••"
+        return copy
+    }
 }

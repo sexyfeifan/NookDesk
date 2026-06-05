@@ -7,6 +7,11 @@ final class ConfigService {
             return ThemeConfig()
         }
 
+        let ext = fileURL.pathExtension.lowercased()
+        if ext == "ts" || ext == "js" || ext == "mts" || ext == "mjs" {
+            return ThemeConfig()
+        }
+
         let content = try String(contentsOf: fileURL, encoding: .utf8)
         let lines = content.components(separatedBy: .newlines)
 

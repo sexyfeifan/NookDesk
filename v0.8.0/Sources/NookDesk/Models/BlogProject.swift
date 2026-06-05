@@ -64,9 +64,10 @@ struct BlogProject: Codable {
            !cachedRoot.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             let cachedURL = URL(fileURLWithPath: cachedRoot, isDirectory: true)
             if let detected = registry.detectBackend(in: cachedURL) {
+                let exec = detected.displayName == "Hugo" ? "hugo" : "npm"
                 return BlogProject(
                     rootPath: cachedURL.path,
-                    buildExecutable: "hugo",
+                    buildExecutable: exec,
                     contentSubpath: detected.preferredContentSubpath(in: cachedURL),
                     gitRemote: "origin",
                     publishBranch: "main",
@@ -79,9 +80,10 @@ struct BlogProject: Codable {
         let parent = cwd.deletingLastPathComponent()
 
         if let detected = registry.detectBackend(in: cwd) {
+            let exec = detected.displayName == "Hugo" ? "hugo" : "npm"
             return BlogProject(
                 rootPath: cwd.path,
-                buildExecutable: "hugo",
+                buildExecutable: exec,
                 contentSubpath: detected.preferredContentSubpath(in: cwd),
                 gitRemote: "origin",
                 publishBranch: "main",
@@ -90,9 +92,10 @@ struct BlogProject: Codable {
         }
 
         if let detected = registry.detectBackend(in: parent) {
+            let exec = detected.displayName == "Hugo" ? "hugo" : "npm"
             return BlogProject(
                 rootPath: parent.path,
-                buildExecutable: "hugo",
+                buildExecutable: exec,
                 contentSubpath: detected.preferredContentSubpath(in: parent),
                 gitRemote: "origin",
                 publishBranch: "main",
@@ -102,7 +105,7 @@ struct BlogProject: Codable {
 
         return BlogProject(
             rootPath: cwd.path,
-            buildExecutable: "hugo",
+            buildExecutable: "npm",
             contentSubpath: "src/pages/Home",
             gitRemote: "origin",
             publishBranch: "main",

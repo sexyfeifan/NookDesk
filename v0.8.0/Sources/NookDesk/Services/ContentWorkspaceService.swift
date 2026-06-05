@@ -190,6 +190,7 @@ final class ContentWorkspaceService {
     }
 
     func menuTreeEntries(posts: [BlogPost]) -> [MenuTreeEntry] {
+        // TODO: Implement menu tree generation from posts
         return []
     }
 

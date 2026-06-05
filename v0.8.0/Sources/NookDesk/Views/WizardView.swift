@@ -362,7 +362,7 @@ struct WizardView: View {
             NookInput("分支名称", text: $githubBranch)
 
             HStack(spacing: 8) {
-                NookButton(.default, size: .small, label: "测试连接") {
+                NookButton(.default, size: .small, label: "格式检查") {
                     testConnection()
                 }
                 .disabled(isTestingConnection || githubRemoteURL.isEmpty)
@@ -375,7 +375,7 @@ struct WizardView: View {
                 if let result = connectionTestResult {
                     StatusBadge(
                         text: result,
-                        level: result.contains("成功") || result.contains("可达") ? .ok : .error
+                        level: result.contains("成功") || result.contains("格式正确") ? .ok : .error
                     )
                 }
             }
@@ -420,7 +420,7 @@ struct WizardView: View {
             }
 
             HStack(spacing: 8) {
-                NookButton(.default, size: .small, label: "测试 Token") {
+                NookButton(.default, size: .small, label: "格式检查") {
                     testToken()
                 }
                 .disabled(isTestingToken || githubToken.isEmpty)
@@ -433,7 +433,7 @@ struct WizardView: View {
                 if let result = tokenTestResult {
                     StatusBadge(
                         text: result,
-                        level: result.contains("有效") ? .ok : .error
+                        level: result.contains("格式正确") ? .ok : .error
                     )
                 }
             }
@@ -503,6 +503,7 @@ struct WizardView: View {
     // MARK: - Actions
 
     private func advanceStep() {
+        wizardError = nil
         if currentStep == 1 {
             let trimmed = projectPath.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { return }
@@ -596,7 +597,7 @@ struct WizardView: View {
             if url.isEmpty {
                 connectionTestResult = "请输入仓库地址"
             } else if url.contains("github.com") {
-                connectionTestResult = "地址格式正确，可达"
+                connectionTestResult = "地址格式正确"
             } else {
                 connectionTestResult = "地址格式可能有误"
             }
@@ -613,7 +614,7 @@ struct WizardView: View {
             if token.isEmpty {
                 tokenTestResult = "请输入 Token"
             } else if token.hasPrefix("ghp_") || token.hasPrefix("github_pat_") {
-                tokenTestResult = "Token 格式有效"
+                tokenTestResult = "Token 格式正确"
             } else {
                 tokenTestResult = "Token 格式可能有误"
             }
