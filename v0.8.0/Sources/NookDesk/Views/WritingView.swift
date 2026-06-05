@@ -302,7 +302,7 @@ struct WritingView: View {
                     NookButton(.primary, size: .small, label: "保存") {
                         saveSelectedTSPost()
                     }
-                    NookButton(.default, size: .small, label: "保存并构建") {
+                    NookButton(.default, size: .small, label: "本地构建测试") {
                         saveSelectedTSPost()
                         ensureNodeModulesThenBuild()
                     }
@@ -842,7 +842,7 @@ struct WritingView: View {
                         viewModel.saveCurrentPost()
                     }
 
-                    NookButton(.default, size: .small, label: "保存并构建") {
+                    NookButton(.default, size: .small, label: "本地构建测试") {
                         applyInputsToPost()
                         viewModel.saveCurrentPost()
                         viewModel.runBuild()

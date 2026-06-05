@@ -666,15 +666,6 @@ final class AppViewModel: ObservableObject {
         let remote = publishRemoteURL.trimmingCharacters(in: .whitespacesAndNewlines)
         let token = preferredGitHubToken
 
-        let sync = try publishService.syncWithRemote(
-            project: project,
-            remoteURL: publishRemoteURL,
-            githubToken: token
-        )
-        if !sync.isEmpty {
-            logs.append(sync)
-        }
-
         if publishService.hasGitHubPagesWorkflow(project: project) {
             logs.append("== Pages Workflow ==\n已检测到 .github/workflows/\(project.backend.workflowFileName)")
         } else {

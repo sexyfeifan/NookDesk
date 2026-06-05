@@ -49,7 +49,7 @@ struct PublishView: View {
                     .font(.custom("Nunito-Black", size: 22))
                     .foregroundColor(.aiTextHeader)
 
-                Text("自动执行：结构检查 → 同步远端 → Workflow/Pages → 提交推送 → 部署状态")
+                Text("自动执行：结构检查 → 保存内容 → Workflow/Pages → 暂存 → 提交推送 → 部署状态")
                     .font(.custom("Nunito-Medium", size: 13))
                     .foregroundColor(.aiTextSecondary)
                     .multilineTextAlignment(.center)
