@@ -15,6 +15,7 @@ final class AppViewModel: ObservableObject {
     @Published var posts: [BlogPost] = []
     @Published var selectedPostID: String?
     @Published var editorPost: BlogPost
+    @Published var hasUnsavedPageChanges = false
     @Published var newPostTitle: String = ""
     @Published var newPostFileName: String = "new-post.md"
     @Published var newPostSectionPath: String = ""
@@ -722,13 +723,22 @@ final class AppViewModel: ObservableObject {
             logs.append("== 检查 Pages 来源 ==\n跳过：未配置远程地址或 GitHub Token。")
         }
 
-        let publish = try publishService.commitAndPush(
-            project: project,
-            message: normalizedPublishMessage,
-            remoteURL: publishRemoteURL,
-            githubToken: token
-        )
-        logs.append(publish)
+        do {
+            let publish = try publishService.commitAndPush(
+                project: project,
+                message: normalizedPublishMessage,
+                remoteURL: publishRemoteURL,
+                githubToken: token
+            )
+            logs.append(publish)
+        } catch {
+            let msg = error.localizedDescription.lowercased()
+            if msg.contains("nothing to commit") || msg.contains("no changes added") {
+                logs.append("== 提交并推送 ==\n没有需要提交的变更，跳过推送。")
+            } else {
+                throw error
+            }
+        }
 
         if !remote.isEmpty, !token.isEmpty {
             do {
@@ -2398,4 +2408,9 @@ struct AIWritingMessage: Identifiable, Codable {
     }
 }
 
+enum EditorMode: String, CaseIterable, Identifiable {
+    case markdown = "Markdown"
+    case richText = "富文本"
 
+    var id: String { rawValue }
+}

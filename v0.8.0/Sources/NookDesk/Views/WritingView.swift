@@ -8,7 +8,6 @@ struct WritingView: View {
     @State private var tagsInput = ""
     @State private var categoriesInput = ""
     @State private var editorSelection = NSRange(location: 0, length: 0)
-    @State private var editorImplementation: EditorImplementation = .vditor
     @State private var imageAltText = ""
     @State private var showDeleteConfirm = false
     @State private var showingAIWritingSheet = false
@@ -283,39 +282,19 @@ struct WritingView: View {
     private func tsEditorArea(post: TypeScriptPostService.TSPPost) -> some View {
         NookCard {
             VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text("正文编辑")
-                        .font(.custom("Nunito-Bold", size: 16))
-                        .foregroundColor(.aiTextHeader)
-                    Spacer()
-                    Picker("", selection: $editorImplementation) {
-                        ForEach(EditorImplementation.allCases) { impl in
-                            Text(impl.rawValue).tag(impl)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.segmented)
-                    .frame(width: 240)
-                }
+                Text("正文编辑")
+                    .font(.custom("Nunito-Bold", size: 16))
+                    .foregroundColor(.aiTextHeader)
 
-                if editorImplementation == .vditor {
-                    VditorEditorView(
-                        text: bindingTSBody(),
-                        statusMessage: $tsStatusMessage,
-                        bridge: vditorBridge,
-                        onRequestImageImport: importImageFromPanel
-                    )
-                    .frame(minHeight: 480)
-                    .background(Color.aiBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                } else {
-                    TextEditor(text: bindingTSBody())
-                        .font(.system(.body, design: .monospaced))
-                        .frame(minHeight: 480)
-                        .padding(8)
-                        .background(Color.aiBackground)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
+                VditorEditorView(
+                    text: bindingTSBody(),
+                    statusMessage: $tsStatusMessage,
+                    bridge: vditorBridge,
+                    onRequestImageImport: importImageFromPanel
+                )
+                .frame(minHeight: 480)
+                .background(Color.aiBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
 
                 NookDivider()
 
@@ -328,7 +307,7 @@ struct WritingView: View {
                         ensureNodeModulesThenBuild()
                     }
                     NookButton(.default, size: .small, label: "AI 写作") {
-                        if editorImplementation == .vditor { vditorBridge.rememberSelection() }
+                        vditorBridge.rememberSelection()
                         viewModel.loadAIWritingHistory()
                         showingAIWritingSheet = true
                     }
@@ -841,42 +820,19 @@ struct WritingView: View {
     private var editorArea: some View {
         NookCard {
             VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text("正文编辑")
-                        .font(.custom("Nunito-Bold", size: 16))
-                        .foregroundColor(.aiTextHeader)
-                    Spacer()
+                Text("正文编辑")
+                    .font(.custom("Nunito-Bold", size: 16))
+                    .foregroundColor(.aiTextHeader)
 
-                    Picker("", selection: $editorImplementation) {
-                        ForEach(EditorImplementation.allCases) { impl in
-                            Text(impl.rawValue).tag(impl)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.segmented)
-                    .frame(width: 240)
-                }
-
-                if editorImplementation == .vditor {
-                    VditorEditorView(
-                        text: $viewModel.editorPost.body,
-                        statusMessage: $viewModel.statusText,
-                        bridge: vditorBridge,
-                        onRequestImageImport: importImageFromPanel
-                    )
-                    .frame(minHeight: 480)
-                    .background(Color.aiBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                } else {
-                    MarkdownTextEditor(
-                        text: $viewModel.editorPost.body,
-                        selection: $editorSelection,
-                        onMenuAction: applyMarkdownAction
-                    )
-                    .frame(minHeight: 480)
-                    .background(Color.aiBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
+                VditorEditorView(
+                    text: $viewModel.editorPost.body,
+                    statusMessage: $viewModel.statusText,
+                    bridge: vditorBridge,
+                    onRequestImageImport: importImageFromPanel
+                )
+                .frame(minHeight: 480)
+                .background(Color.aiBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
 
                 NookDivider()
 
@@ -1227,12 +1183,6 @@ struct WritingView: View {
         input.wrappedValue = values.joined(separator: ", ")
     }
 
-    private func applyMarkdownAction(_ action: MarkdownAction) {
-        let result = MarkdownEditing.apply(action: action, to: viewModel.editorPost.body, selection: editorSelection)
-        viewModel.editorPost.body = result.text
-        editorSelection = result.selection
-    }
-
     private func importImageFromPanel() {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = false
@@ -1242,34 +1192,23 @@ struct WritingView: View {
         panel.prompt = "选择"
         guard panel.runModal() == .OK, let imageURL = panel.url else { return }
 
-        if editorImplementation == .native {
-            let next = viewModel.importImageIntoPost(from: imageURL, altText: imageAltText, insertionRange: nil)
-            editorSelection = next
-        } else {
-            do {
-                vditorBridge.rememberSelection()
-                let snippet = try viewModel.makeImportedImageMarkdown(from: imageURL, altText: imageAltText)
-                vditorBridge.insertMarkdown(snippet)
-                vditorBridge.focus()
-            } catch {
-                viewModel.statusText = error.localizedDescription
-            }
+        do {
+            vditorBridge.rememberSelection()
+            let snippet = try viewModel.makeImportedImageMarkdown(from: imageURL, altText: imageAltText)
+            vditorBridge.insertMarkdown(snippet)
+            vditorBridge.focus()
+        } catch {
+            viewModel.statusText = error.localizedDescription
         }
     }
 
     private func insertSnippetIntoEditor(_ snippet: String) {
-        if editorImplementation == .vditor {
-            vditorBridge.insertMarkdown(snippet)
-            vditorBridge.focus()
-            return
-        }
-        let insertionPoint = max(0, editorSelection.location + editorSelection.length)
-        let next = viewModel.insertPostSnippet(snippet, at: NSRange(location: insertionPoint, length: 0))
-        editorSelection = next
+        vditorBridge.insertMarkdown(snippet)
+        vditorBridge.focus()
     }
 
     private func openAIWritingSheet() {
-        if editorImplementation == .vditor { vditorBridge.rememberSelection() }
+        vditorBridge.rememberSelection()
         viewModel.loadAIWritingHistory()
         showingAIWritingSheet = true
     }
@@ -1371,15 +1310,6 @@ private struct WritingSidebarNode: Identifiable {
 
         return freeze(root)
     }
-}
-
-// MARK: - Editor Implementation Enum
-
-private enum EditorImplementation: String, CaseIterable, Identifiable {
-    case vditor = "Vditor"
-    case native = "Markdown 模式"
-
-    var id: String { rawValue }
 }
 
 // MARK: - FlowWrap (local copy)

@@ -2,673 +2,613 @@ import SwiftUI
 
 struct PageEditorView: View {
     @ObservedObject var viewModel: AppViewModel
-    @State private var selectedPage: EditablePage = .home
-    @State private var editingText: String = ""
-    @State private var isLoading = false
     @State private var statusMessage: String = ""
 
-    private let tsPostService = TypeScriptPostService()
+    @State private var brandTitle = ""
+    @State private var brandSubtitle = ""
+    @State private var heroTypewriter = ""
+    @State private var heroDescription = ""
 
-    enum EditablePage: String, CaseIterable, Identifiable {
-        case home = "Home.tsx"
-        case posts = "posts.ts"
-        case config = "vite.config.ts"
-        case index = "index.html"
+    @State private var skills: [SkillItem] = []
+    @State private var stats: [StatItem] = []
+    @State private var aboutName = ""
+    @State private var aboutDescription = ""
+    @State private var faqs: [FAQItem] = []
 
-        var id: String { rawValue }
+    struct SkillItem: Identifiable {
+        let id = UUID()
+        var name: String
+        var color: String
+    }
 
-        var icon: String {
-            switch self {
-            case .home: return "house.fill"
-            case .posts: return "doc.text.fill"
-            case .config: return "gearshape.fill"
-            case .index: return "doc.richtext"
-            }
-        }
+    struct StatItem: Identifiable {
+        let id = UUID()
+        var label: String
+        var value: String
+        var color: String
+    }
 
-        var description: String {
-            switch self {
-            case .home: return "首页内容：个人信息、技能、统计、关于、FAQ"
-            case .posts: return "文章数据：所有博客文章的 TypeScript 数据"
-            case .config: return "Vite 构建配置：base 路径、插件、CSS 预处理"
-            case .index: return "HTML 入口：页面标题、语言设置、meta 标签"
-            }
-        }
+    struct FAQItem: Identifiable {
+        let id = UUID()
+        var question: String
+        var answer: String
+    }
+
+    private var homeURL: URL {
+        viewModel.project.rootURL.appendingPathComponent("src/pages/Home/Home.tsx")
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            pageSelector
-            NookDivider()
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                headerCard
+                brandSection
+                heroSection
+                skillsSection
+                statsSection
+                aboutSection
+                faqSection
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    if selectedPage == .posts {
-                        postsPageEditor
-                    } else {
-                        fieldBasedEditor
-                    }
-                }
-                .padding()
-            }
-        }
-    }
-
-    private var pageSelector: some View {
-        HStack(spacing: 12) {
-            ForEach(EditablePage.allCases) { page in
-                Button {
-                    selectedPage = page
-                    if page == .posts {
-                        loadPageContent()
-                    } else {
-                        loadFieldBasedContent()
-                    }
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: page.icon)
-                            .font(.system(size: 12))
-                        Text(page.rawValue)
-                            .font(.custom("Nunito-SemiBold", size: 13))
-                    }
-                    .foregroundColor(selectedPage == page ? .white : .aiTextBody)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(selectedPage == page ? Color.aiPrimary : Color.clear)
-                    )
-                }
-                .buttonStyle(.plain)
-            }
-
-            Spacer()
-
-            Text(selectedPage.description)
-                .font(.custom("Nunito-Regular", size: 12))
-                .foregroundColor(.aiTextMuted)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(Color.aiSecondaryBg)
-        .onAppear { loadFieldBasedContent() }
-    }
-
-    // MARK: - Field-Based Editor
-
-    private struct EditableField: Identifiable {
-        let id = UUID()
-        let name: String
-        let currentValue: String
-        let affects: String
-        let description: String
-        var filePath: String
-        var lineHint: String
-    }
-
-    @State private var editableFields: [EditableField] = []
-    @State private var editingValues: [UUID: String] = [:]
-
-    private var fieldBasedEditor: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            headerCard
-
-            ForEach(groupedFields, id: \.0) { group, fields in
-                NookCard(color: colorForGroup(group)) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text(group)
-                            .font(.custom("Nunito-Bold", size: 16))
-                            .foregroundColor(.aiTextHeader)
-
-                        ForEach(fields) { field in
-                            fieldRow(field)
-                        }
-                    }
-                }
-            }
-
-            HStack(spacing: 8) {
-                NookButton(.primary, size: .small, label: "保存全部更改") {
-                    saveFieldChanges()
-                }
-                NookButton(.default, size: .small, label: "重新加载") {
-                    loadFieldBasedContent()
-                }
-                Spacer()
                 if !statusMessage.isEmpty {
                     Text(statusMessage)
                         .font(.custom("Nunito-Regular", size: 12))
                         .foregroundColor(.aiTextMuted)
+                        .padding(.horizontal, 4)
                 }
             }
+            .padding()
         }
+        .onAppear { loadAllSections() }
     }
 
     private var headerCard: some View {
         NookCard(color: .appBlue) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
-                    Image(systemName: "lightbulb.fill")
-                        .foregroundColor(NookColor.appYellow.color)
-                    Text("傻瓜式编辑器")
+                    Image(systemName: "paintbrush.fill")
+                        .foregroundColor(NookColor.appBlue.color)
+                    Text("首页编辑器")
                         .font(.custom("Nunito-Bold", size: 16))
                         .foregroundColor(.aiTextHeader)
                 }
-                Text("每个字段都有说明，告诉你它在哪个文件的哪个位置。修改后点击「保存全部更改」即可写入文件。")
+                Text("在这里修改博客首页的各个区域，无需接触代码。每个区域修改后点击「保存」即可写入文件。")
                     .font(.custom("Nunito-Regular", size: 13))
                     .foregroundColor(.aiTextSecondary)
             }
         }
     }
 
-    private func fieldRow(_ field: EditableField) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(field.name)
-                        .font(.custom("Nunito-Bold", size: 14))
-                        .foregroundColor(.aiTextHeader)
+    // MARK: - Brand Section
 
-                    Text(field.description)
-                        .font(.custom("Nunito-Regular", size: 12))
-                        .foregroundColor(.aiTextSecondary)
+    private var brandSection: some View {
+        NookCard(color: .appYellow) {
+            VStack(alignment: .leading, spacing: 12) {
+                sectionHeader("品牌标识", icon: "flag.fill")
+                NookDivider()
 
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.right.circle.fill")
-                            .font(.system(size: 10))
-                            .foregroundColor(.aiPrimary)
-                        Text("影响: \(field.affects)")
-                            .font(.custom("Nunito-Regular", size: 11))
-                            .foregroundColor(.aiPrimary)
+                fieldRow("站点标题") {
+                    TextField("站点标题", text: $brandTitle)
+                        .textFieldStyle(.roundedBorder)
+                }
+                fieldRow("站点副标题") {
+                    TextField("站点副标题", text: $brandSubtitle)
+                        .textFieldStyle(.roundedBorder)
+                }
+
+                saveButton {
+                    saveBrand()
+                }
+            }
+        }
+    }
+
+    // MARK: - Hero Section
+
+    private var heroSection: some View {
+        NookCard(color: .appPink) {
+            VStack(alignment: .leading, spacing: 12) {
+                sectionHeader("英雄区", icon: "text.bubble.fill")
+                NookDivider()
+
+                fieldRow("打字机动画文字") {
+                    TextField("打字机动画文字", text: $heroTypewriter, axis: .vertical)
+                        .lineLimit(2...4)
+                        .textFieldStyle(.roundedBorder)
+                }
+                fieldRow("描述文字") {
+                    TextField("描述文字", text: $heroDescription, axis: .vertical)
+                        .lineLimit(2...4)
+                        .textFieldStyle(.roundedBorder)
+                }
+
+                saveButton {
+                    saveHero()
+                }
+            }
+        }
+    }
+
+    // MARK: - Skills Section
+
+    private var skillsSection: some View {
+        NookCard(color: .appBlue) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    sectionHeader("技能标签", icon: "star.fill")
+                    Spacer()
+                    NookButton(.default, size: .small, label: "+ 添加") {
+                        skills.append(SkillItem(name: "新技能", color: "app-blue"))
+                    }
+                }
+                NookDivider()
+
+                ForEach(skills.indices, id: \.self) { idx in
+                    HStack(spacing: 8) {
+                        TextField("技能名", text: $skills[idx].name)
+                            .textFieldStyle(.roundedBorder)
+                        Picker("", selection: $skills[idx].color) {
+                            ForEach(blogColors, id: \.self) { color in
+                                Text(color).tag(color)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .frame(width: 130)
+
+                        Button {
+                            skills.remove(at: idx)
+                        } label: {
+                            Image(systemName: "minus.circle")
+                                .font(.system(size: 13))
+                                .foregroundColor(.aiError)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
 
-                Spacer()
-
-                NookButton(.primary, size: .small, label: "保存") {
-                    saveSingleField(field)
+                saveButton {
+                    saveSkills()
                 }
-                .disabled((editingValues[field.id] ?? field.currentValue) == field.currentValue)
-            }
-
-            if field.currentValue.count > 80 {
-                TextEditor(text: Binding(
-                    get: { editingValues[field.id] ?? field.currentValue },
-                    set: { editingValues[field.id] = $0 }
-                ))
-                .font(.system(.body, design: .monospaced))
-                .frame(minHeight: 60, maxHeight: 120)
-                .padding(4)
-                .background(Color.aiBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-            } else {
-                TextField(field.currentValue, text: Binding(
-                    get: { editingValues[field.id] ?? field.currentValue },
-                    set: { editingValues[field.id] = $0 }
-                ))
-                .textFieldStyle(.roundedBorder)
-                .font(.custom("Nunito-Medium", size: 13))
             }
         }
-        .padding(.vertical, 4)
     }
 
-    private var groupedFields: [(String, [EditableField])] {
-        Dictionary(grouping: editableFields, by: { $0.filePath })
-            .sorted { $0.key < $1.key }
-            .map { ($0.key, $0.value) }
-    }
+    // MARK: - Stats Section
 
-    private func colorForGroup(_ group: String) -> NookColor {
-        switch group {
-        case "Home.tsx": return .appBlue
-        case "posts.ts": return .appGreen
-        case "vite.config.ts": return .appOrange
-        case "index.html": return .appYellow
-        default: return .nookDefault
+    private var statsSection: some View {
+        NookCard(color: .appOrange) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    sectionHeader("统计数据", icon: "chart.bar.fill")
+                    Spacer()
+                    NookButton(.default, size: .small, label: "+ 添加") {
+                        stats.append(StatItem(label: "新统计", value: "0", color: "app-yellow"))
+                    }
+                }
+                NookDivider()
+
+                ForEach(stats.indices, id: \.self) { idx in
+                    HStack(spacing: 8) {
+                        TextField("标签", text: $stats[idx].label)
+                            .textFieldStyle(.roundedBorder)
+                        TextField("数值", text: $stats[idx].value)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 80)
+                        Picker("", selection: $stats[idx].color) {
+                            ForEach(blogColors, id: \.self) { color in
+                                Text(color).tag(color)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .frame(width: 130)
+
+                        Button {
+                            stats.remove(at: idx)
+                        } label: {
+                            Image(systemName: "minus.circle")
+                                .font(.system(size: 13))
+                                .foregroundColor(.aiError)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                saveButton {
+                    saveStats()
+                }
+            }
         }
     }
 
-    private func loadFieldBasedContent() {
-        editableFields = []
-        editingValues = [:]
-        statusMessage = ""
+    // MARK: - About Section
 
-        let root = viewModel.project.rootURL
+    private var aboutSection: some View {
+        NookCard(color: .appGreen) {
+            VStack(alignment: .leading, spacing: 12) {
+                sectionHeader("关于我", icon: "person.fill")
+                NookDivider()
 
-        switch selectedPage {
-        case .home:
-            loadHomeFields(root: root)
-        case .config:
-            loadConfigFields(root: root)
-        case .index:
-            loadIndexFields(root: root)
-        case .posts:
-            break
+                fieldRow("姓名 / 身份") {
+                    TextField("姓名 / 身份", text: $aboutName)
+                        .textFieldStyle(.roundedBorder)
+                }
+                fieldRow("个人描述") {
+                    TextField("个人描述", text: $aboutDescription, axis: .vertical)
+                        .lineLimit(3...6)
+                        .textFieldStyle(.roundedBorder)
+                }
+
+                saveButton {
+                    saveAbout()
+                }
+            }
         }
     }
 
-    private func loadHomeFields(root: URL) {
-        let homePath = root.appendingPathComponent("src/pages/Home/Home.tsx")
-        guard let content = try? String(contentsOf: homePath, encoding: .utf8) else {
+    // MARK: - FAQ Section
+
+    private var faqSection: some View {
+        NookCard(color: .appTeal) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    sectionHeader("常见问题", icon: "bubble.left.and.bubble.right.fill")
+                    Spacer()
+                    NookButton(.default, size: .small, label: "+ 添加") {
+                        faqs.append(FAQItem(question: "新问题？", answer: "新回答"))
+                    }
+                }
+                NookDivider()
+
+                ForEach(faqs.indices, id: \.self) { idx in
+                    NookCard(color: .nookDefault) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("问题 \(idx + 1)")
+                                    .font(.custom("Nunito-SemiBold", size: 13))
+                                    .foregroundColor(.aiTextHeader)
+                                Spacer()
+                                Button {
+                                    faqs.remove(at: idx)
+                                } label: {
+                                    Image(systemName: "minus.circle")
+                                        .font(.system(size: 13))
+                                        .foregroundColor(.aiError)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            TextField("问题", text: $faqs[idx].question)
+                                .textFieldStyle(.roundedBorder)
+                            TextField("回答", text: $faqs[idx].answer, axis: .vertical)
+                                .lineLimit(2...4)
+                                .textFieldStyle(.roundedBorder)
+                        }
+                    }
+                }
+
+                saveButton {
+                    saveFAQs()
+                }
+            }
+        }
+    }
+
+    // MARK: - UI Helpers
+
+    private func sectionHeader(_ title: String, icon: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .foregroundColor(.aiPrimary)
+            Text(title)
+                .font(.custom("Nunito-Bold", size: 16))
+                .foregroundColor(.aiTextHeader)
+        }
+    }
+
+    private func fieldRow<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.custom("Nunito-SemiBold", size: 12))
+                .foregroundColor(.aiTextSecondary)
+            content()
+        }
+    }
+
+    private func saveButton(action: @escaping () -> Void) -> some View {
+        HStack {
+            Spacer()
+            NookButton(.primary, size: .small, label: "保存") {
+                action()
+            }
+        }
+    }
+
+    private let blogColors = [
+        "app-pink", "purple", "app-blue", "app-yellow", "app-orange",
+        "app-teal", "app-green", "app-red", "lime-green", "yellow-green",
+        "brown", "warm-peach-pink",
+    ]
+
+    // MARK: - Load
+
+    private func loadAllSections() {
+        guard let content = try? String(contentsOf: homeURL, encoding: .utf8) else {
             statusMessage = "无法读取 Home.tsx"
             return
         }
 
-        func lineHint(for marker: String) -> String {
-            let lines = content.components(separatedBy: .newlines)
-            for (i, line) in lines.enumerated() {
-                if line.contains(marker) {
-                    return "Home.tsx 第\(i + 1)行"
-                }
-            }
-            return "Home.tsx"
-        }
+        brandTitle = extractText(in: content, after: "blog-logo-title\">", before: "</div>") ?? ""
+        brandSubtitle = extractText(in: content, after: "blog-logo-sub\">", before: "</div>") ?? ""
 
-        var fields: [EditableField] = []
+        heroTypewriter = extractTypewriterText(from: content) ?? ""
+        heroDescription = extractHeroDescription(from: content) ?? ""
 
-        fields.append(EditableField(
-            name: "站点标题",
-            currentValue: extractBetween(content, after: "blog-logo-title\">", before: "</div>") ?? "sexyfeifan 的小岛",
-            affects: lineHint(for: "blog-logo-title"),
-            description: "显示在博客左上角的品牌名称",
-            filePath: "Home.tsx",
-            lineHint: "blog-logo-title"
-        ))
+        skills = parseSkills(from: content)
+        stats = parseStats(from: content)
+        aboutName = extractText(in: content, after: "<h3>", before: "</h3>") ?? ""
+        aboutDescription = extractAboutDescription(from: content) ?? ""
+        faqs = parseFAQs(from: content)
 
-        fields.append(EditableField(
-            name: "站点副标题",
-            currentValue: extractBetween(content, after: "blog-logo-sub\">", before: "</div>") ?? "code, tools & random thoughts",
-            affects: lineHint(for: "blog-logo-sub"),
-            description: "品牌名称下方的小字描述",
-            filePath: "Home.tsx",
-            lineHint: "blog-logo-sub"
-        ))
-
-        fields.append(EditableField(
-            name: "英雄区打字文本",
-            currentValue: extractBetween(content, after: "Typewriter", before: "</Typewriter>")?.replacingOccurrences(of: ">\n                            ", with: "").trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
-            affects: lineHint(for: "Typewriter"),
-            description: "首页大标题的打字机动画文本",
-            filePath: "Home.tsx",
-            lineHint: "Typewriter"
-        ))
-
-        fields.append(EditableField(
-            name: "英雄区描述",
-            currentValue: extractBetween(content, after: "blog-hero-sub\">", before: "</p>")?.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
-            affects: lineHint(for: "blog-hero-sub"),
-            description: "英雄区标题下方的描述段落",
-            filePath: "Home.tsx",
-            lineHint: "blog-hero-sub"
-        ))
-
-        fields.append(EditableField(
-            name: "关于区头像 Emoji",
-            currentValue: extractBetween(content, after: "blog-avatar\">", before: "</div>") ?? "🦊",
-            affects: lineHint(for: "blog-avatar"),
-            description: "「关于我」区域的头像 emoji",
-            filePath: "Home.tsx",
-            lineHint: "blog-avatar"
-        ))
-
-        fields.append(EditableField(
-            name: "关于区姓名/身份",
-            currentValue: extractBetween(content, after: "<h3>", before: "</h3>") ?? "",
-            affects: lineHint(for: "<h3>"),
-            description: "「关于我」区域的姓名和身份描述",
-            filePath: "Home.tsx",
-            lineHint: "about h3"
-        ))
-
-        fields.append(EditableField(
-            name: "关于区描述",
-            currentValue: extractBetween(content, after: "关于我</h2>", before: "</Card>")?.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
-            affects: lineHint(for: "关于我</h2>"),
-            description: "「关于我」区域的详细介绍",
-            filePath: "Home.tsx",
-            lineHint: "about p"
-        ))
-
-        editableFields = fields
-        statusMessage = "已加载 Home.tsx 的 \(fields.count) 个可编辑字段。"
+        statusMessage = "已加载首页数据。"
     }
 
-    private func loadConfigFields(root: URL) {
-        let configPath = root.appendingPathComponent("vite.config.ts")
-        guard let content = try? String(contentsOf: configPath, encoding: .utf8) else {
-            statusMessage = "无法读取 vite.config.ts"
+    // MARK: - Save Brand
+
+    private func saveBrand() {
+        guard var content = try? String(contentsOf: homeURL, encoding: .utf8) else {
+            statusMessage = "无法读取 Home.tsx"
             return
         }
+        let oldTitle = extractText(in: content, after: "blog-logo-title\">", before: "</div>") ?? ""
+        let oldSub = extractText(in: content, after: "blog-logo-sub\">", before: "</div>") ?? ""
 
-        func lineHint(for marker: String) -> String {
-            let lines = content.components(separatedBy: .newlines)
-            for (i, line) in lines.enumerated() {
-                if line.contains(marker) {
-                    return "vite.config.ts 第\(i + 1)行"
-                }
-            }
-            return "vite.config.ts"
-        }
-
-        var fields: [EditableField] = []
-
-        let baseValue = extractBetween(content, after: "base:", before: ",")?.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "\"", with: "").replacingOccurrences(of: "'", with: "") ?? "/"
-        fields.append(EditableField(
-            name: "Base 路径",
-            currentValue: baseValue,
-            affects: lineHint(for: "base:"),
-            description: "部署 URL 的基础路径。GitHub Pages 用户页通常是 /，项目页是 /repo-name/",
-            filePath: "vite.config.ts",
-            lineHint: "base"
-        ))
-
-        let hasLess = content.contains("less")
-        fields.append(EditableField(
-            name: "Less 预处理器",
-            currentValue: hasLess ? "已启用" : "未启用",
-            affects: lineHint(for: "less"),
-            description: "是否启用 Less CSS 预处理器",
-            filePath: "vite.config.ts",
-            lineHint: "less"
-        ))
-
-        let hasSvgr = content.contains("svgr")
-        fields.append(EditableField(
-            name: "SVGR 插件",
-            currentValue: hasSvgr ? "已启用" : "未启用",
-            affects: lineHint(for: "svgr"),
-            description: "是否启用 SVG 作为 React 组件的插件",
-            filePath: "vite.config.ts",
-            lineHint: "svgr"
-        ))
-
-        editableFields = fields
-        statusMessage = "已加载 vite.config.ts 的 \(fields.count) 个可编辑字段。"
-    }
-
-    private func loadIndexFields(root: URL) {
-        let indexPath = root.appendingPathComponent("index.html")
-        guard let content = try? String(contentsOf: indexPath, encoding: .utf8) else {
-            statusMessage = "无法读取 index.html"
-            return
-        }
-
-        func lineHint(for marker: String) -> String {
-            let lines = content.components(separatedBy: .newlines)
-            for (i, line) in lines.enumerated() {
-                if line.contains(marker) {
-                    return "index.html 第\(i + 1)行"
-                }
-            }
-            return "index.html"
-        }
-
-        var fields: [EditableField] = []
-
-        fields.append(EditableField(
-            name: "页面标题",
-            currentValue: extractBetween(content, after: "<title>", before: "</title>") ?? "",
-            affects: lineHint(for: "<title>"),
-            description: "浏览器标签页上显示的标题，也用于搜索引擎结果",
-            filePath: "index.html",
-            lineHint: "title"
-        ))
-
-        let lang = extractBetween(content, after: "<html lang=\"", before: "\"") ?? "ja"
-        fields.append(EditableField(
-            name: "语言设置",
-            currentValue: lang,
-            affects: lineHint(for: "<html lang"),
-            description: "页面语言代码，如 zh-CN（中文）、ja（日语）、en（英语）",
-            filePath: "index.html",
-            lineHint: "lang"
-        ))
-
-        let charset = content.contains("UTF-8") ? "UTF-8" : "未知"
-        fields.append(EditableField(
-            name: "字符编码",
-            currentValue: charset,
-            affects: lineHint(for: "charset"),
-            description: "页面字符编码（通常保持 UTF-8）",
-            filePath: "index.html",
-            lineHint: "charset"
-        ))
-
-        editableFields = fields
-        statusMessage = "已加载 index.html 的 \(fields.count) 个可编辑字段。"
-    }
-
-    private func saveFieldChanges() {
-        let root = viewModel.project.rootURL
-        var changedFiles = Set<String>()
-
-        for field in editableFields {
-            guard let newValue = editingValues[field.id], newValue != field.currentValue else { continue }
-
-            let filePath: URL
-            switch field.filePath {
-            case "Home.tsx":
-                filePath = root.appendingPathComponent("src/pages/Home/Home.tsx")
-            case "vite.config.ts":
-                filePath = root.appendingPathComponent("vite.config.ts")
-            case "index.html":
-                filePath = root.appendingPathComponent("index.html")
-            default:
-                continue
-            }
-
-            guard var content = try? String(contentsOf: filePath, encoding: .utf8) else { continue }
-
-            switch field.name {
-            case "站点标题":
-                content = replaceInHTML(content, cssClass: "blog-logo-title", newInner: newValue)
-            case "站点副标题":
-                content = replaceInHTML(content, cssClass: "blog-logo-sub", newInner: newValue)
-            case "关于区头像 Emoji":
-                content = replaceInHTML(content, cssClass: "blog-avatar", newInner: newValue)
-            case "页面标题", "页面标题 (title tag)":
-                content = replaceBetween(content, after: "<title>", before: "</title>", with: newValue)
-            case "语言设置":
-                content = content.replacingOccurrences(
-                    of: "<html lang=\"\(field.currentValue)\">",
-                    with: "<html lang=\"\(newValue)\">"
-                )
-            case "Base 路径":
-                content = content.replacingOccurrences(
-                    of: "base: \"\(field.currentValue)\"",
-                    with: "base: \"\(newValue)\""
-                )
-                if content.contains("base: '\(field.currentValue)'") {
-                    content = content.replacingOccurrences(
-                        of: "base: '\(field.currentValue)'",
-                        with: "base: '\(newValue)'"
-                    )
-                }
-            default:
-                break
-            }
-
-            do {
-                try content.write(to: filePath, atomically: true, encoding: .utf8)
-                changedFiles.insert(field.filePath)
-            } catch {
-                statusMessage = "保存失败：\(error.localizedDescription)"
-                return
-            }
-        }
-
-        if changedFiles.isEmpty {
-            statusMessage = "没有更改需要保存。"
-        } else {
-            statusMessage = "已保存到：\(changedFiles.sorted().joined(separator: ", "))"
-            editingValues = [:]
-            loadFieldBasedContent()
-        }
-    }
-
-    private func saveSingleField(_ field: EditableField) {
-        guard let newValue = editingValues[field.id], newValue != field.currentValue else {
-            statusMessage = "没有更改。"
-            return
-        }
-
-        let root = viewModel.project.rootURL
-        let filePath: URL
-        switch field.filePath {
-        case "Home.tsx":
-            filePath = root.appendingPathComponent("src/pages/Home/Home.tsx")
-        case "vite.config.ts":
-            filePath = root.appendingPathComponent("vite.config.ts")
-        case "index.html":
-            filePath = root.appendingPathComponent("index.html")
-        default:
-            return
-        }
-
-        guard var content = try? String(contentsOf: filePath, encoding: .utf8) else {
-            statusMessage = "无法读取文件。"
-            return
-        }
-
-        switch field.name {
-        case "站点标题":
-            content = replaceInHTML(content, cssClass: "blog-logo-title", newInner: newValue)
-        case "站点副标题":
-            content = replaceInHTML(content, cssClass: "blog-logo-sub", newInner: newValue)
-        case "关于区头像 Emoji":
-            content = replaceInHTML(content, cssClass: "blog-avatar", newInner: newValue)
-        case "页面标题":
-            content = replaceBetween(content, after: "<title>", before: "</title>", with: newValue)
-        case "语言设置":
+        if !oldTitle.isEmpty && oldTitle != brandTitle {
             content = content.replacingOccurrences(
-                of: "<html lang=\"\(field.currentValue)\">",
-                with: "<html lang=\"\(newValue)\">"
+                of: "blog-logo-title\">\(oldTitle)</div>",
+                with: "blog-logo-title\">\(brandTitle)</div>"
             )
-        case "Base 路径":
+        }
+        if !oldSub.isEmpty && oldSub != brandSubtitle {
             content = content.replacingOccurrences(
-                of: "base: \"\(field.currentValue)\"",
-                with: "base: \"\(newValue)\""
+                of: "blog-logo-sub\">\(oldSub)</div>",
+                with: "blog-logo-sub\">\(brandSubtitle)</div>"
             )
-            if content.contains("base: '\(field.currentValue)'") {
-                content = content.replacingOccurrences(
-                    of: "base: '\(field.currentValue)'",
-                    with: "base: '\(newValue)'"
-                )
-            }
-        default:
-            break
         }
 
+        writeBack(content, section: "品牌标识")
+    }
+
+    // MARK: - Save Hero
+
+    private func saveHero() {
+        guard var content = try? String(contentsOf: homeURL, encoding: .utf8) else {
+            statusMessage = "无法读取 Home.tsx"
+            return
+        }
+
+        let oldTypewriter = extractTypewriterText(from: content) ?? ""
+        if !oldTypewriter.isEmpty && oldTypewriter != heroTypewriter {
+            content = content.replacingOccurrences(of: oldTypewriter, with: heroTypewriter)
+        }
+
+        let oldDesc = extractHeroDescription(from: content) ?? ""
+        if !oldDesc.isEmpty && oldDesc != heroDescription {
+            content = content.replacingOccurrences(of: oldDesc, with: heroDescription)
+        }
+
+        writeBack(content, section: "英雄区")
+    }
+
+    // MARK: - Save Skills
+
+    private func saveSkills() {
+        guard var content = try? String(contentsOf: homeURL, encoding: .utf8) else {
+            statusMessage = "无法读取 Home.tsx"
+            return
+        }
+
+        let oldBlock = extractArrayBlock(in: content, marker: "const skills:")
+        let newItems = skills.map { "    { name: \"\($0.name)\", color: \"\($0.color)\" }" }.joined(separator: ",\n")
+        let newBlock = "const skills: { name: string; color: BlogColor }[] = [\n\(newItems),\n];"
+
+        if let old = oldBlock {
+            content = content.replacingOccurrences(of: old, with: newBlock)
+        }
+
+        writeBack(content, section: "技能标签")
+    }
+
+    // MARK: - Save Stats
+
+    private func saveStats() {
+        guard var content = try? String(contentsOf: homeURL, encoding: .utf8) else {
+            statusMessage = "无法读取 Home.tsx"
+            return
+        }
+
+        let oldBlock = extractArrayBlock(in: content, marker: "const stats:")
+        let newItems = stats.map { "    { label: \"\($0.label)\", value: \"\($0.value)\", color: \"\($0.color)\" }" }.joined(separator: ",\n")
+        let newBlock = "const stats: { label: string; value: string; color: BlogColor }[] = [\n\(newItems),\n];"
+
+        if let old = oldBlock {
+            content = content.replacingOccurrences(of: old, with: newBlock)
+        }
+
+        writeBack(content, section: "统计数据")
+    }
+
+    // MARK: - Save About
+
+    private func saveAbout() {
+        guard var content = try? String(contentsOf: homeURL, encoding: .utf8) else {
+            statusMessage = "无法读取 Home.tsx"
+            return
+        }
+
+        let oldName = extractText(in: content, after: "<h3>", before: "</h3>") ?? ""
+        if !oldName.isEmpty && oldName != aboutName {
+            content = content.replacingOccurrences(of: "<h3>\(oldName)</h3>", with: "<h3>\(aboutName)</h3>")
+        }
+
+        let oldDesc = extractAboutDescription(from: content) ?? ""
+        if !oldDesc.isEmpty && oldDesc != aboutDescription {
+            content = content.replacingOccurrences(of: oldDesc, with: aboutDescription)
+        }
+
+        writeBack(content, section: "关于我")
+    }
+
+    // MARK: - Save FAQs
+
+    private func saveFAQs() {
+        guard var content = try? String(contentsOf: homeURL, encoding: .utf8) else {
+            statusMessage = "无法读取 Home.tsx"
+            return
+        }
+
+        let oldFAQs = parseFAQs(from: content)
+        for (idx, faq) in faqs.enumerated() {
+            guard idx < oldFAQs.count else { break }
+            let old = oldFAQs[idx]
+            if old.question != faq.question {
+                content = content.replacingOccurrences(
+                    of: "question=\"\(old.question)\"",
+                    with: "question=\"\(faq.question)\""
+                )
+            }
+            if old.answer != faq.answer {
+                content = content.replacingOccurrences(
+                    of: "answer=\"\(old.answer)\"",
+                    with: "answer=\"\(faq.answer)\""
+                )
+            }
+        }
+
+        if faqs.count > oldFAQs.count {
+            let insertMarker = "</div>\n            </section>\n\n            <Divider type=\"line-yellow\""
+            let newFAQs = faqs[oldFAQs.count...].map { faq in
+                """
+                            <Collapse
+                                question=\"\(faq.question)\"
+                                answer=\"\(faq.answer)\"
+                            />
+                """
+            }.joined(separator: "\n")
+            if let range = content.range(of: insertMarker) {
+                content.insert(contentsOf: newFAQs + "\n", at: range.lowerBound)
+            }
+        }
+
+        writeBack(content, section: "常见问题")
+    }
+
+    // MARK: - Write Back
+
+    private func writeBack(_ content: String, section: String) {
         do {
-            try content.write(to: filePath, atomically: true, encoding: .utf8)
-            statusMessage = "「\(field.name)」已保存到 \(field.filePath)。"
-            editingValues[field.id] = nil
-            loadFieldBasedContent()
+            try content.write(to: homeURL, atomically: true, encoding: .utf8)
+            statusMessage = "「\(section)」已保存。"
+            viewModel.hasUnsavedPageChanges = true
         } catch {
             statusMessage = "保存失败：\(error.localizedDescription)"
         }
     }
 
-    // MARK: - Posts Page Editor
+    // MARK: - Parsing Helpers
 
-    private var postsPageEditor: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            NookCard(color: .appGreen) {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "doc.text.fill")
-                            .foregroundColor(NookColor.appGreen.color)
-                        Text("posts.ts 文章数据")
-                            .font(.custom("Nunito-Bold", size: 16))
-                            .foregroundColor(.aiTextHeader)
-                    }
-
-                    Text("文章数据通过写作页面管理。请切换到「写作」标签页使用完整的文章编辑功能，包括创建、编辑和删除文章。")
-                        .font(.custom("Nunito-Medium", size: 13))
-                        .foregroundColor(.aiTextSecondary)
-
-                    NookButton(.primary, size: .small, label: "切换到写作页面") {
-                        NotificationCenter.default.post(name: .switchToWritingTab, object: nil)
-                    }
-                }
-            }
-        }
-    }
-
-    // MARK: - File Operations
-
-    private func loadPageContent() {
-        isLoading = true
-        statusMessage = ""
-
-        let filePath = filePathForSelectedPage()
-        if let content = try? String(contentsOf: filePath, encoding: .utf8) {
-            editingText = content
-            statusMessage = "已加载 \(selectedPage.rawValue)"
-        } else {
-            editingText = "// 文件未找到: \(filePath.path)"
-            statusMessage = "文件未找到"
-        }
-        isLoading = false
-    }
-
-    private func savePageContent() {
-        let filePath = filePathForSelectedPage()
-        do {
-            try FileManager.default.createDirectory(at: filePath.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try editingText.write(to: filePath, atomically: true, encoding: .utf8)
-            statusMessage = "已保存 \(selectedPage.rawValue)"
-        } catch {
-            statusMessage = "保存失败：\(error.localizedDescription)"
-        }
-    }
-
-    private func filePathForSelectedPage() -> URL {
-        let root = viewModel.project.rootURL
-        switch selectedPage {
-        case .home:
-            return root.appendingPathComponent("src/pages/Home/Home.tsx")
-        case .posts:
-            return root.appendingPathComponent("src/pages/Home/posts.ts")
-        case .config:
-            return root.appendingPathComponent("vite.config.ts")
-        case .index:
-            return root.appendingPathComponent("index.html")
-        }
-    }
-
-    // MARK: - String Helpers
-
-    private func extractBetween(_ text: String, after: String, before: String) -> String? {
+    private func extractText(in text: String, after: String, before: String) -> String? {
         guard let startRange = text.range(of: after) else { return nil }
         let afterStart = text[startRange.upperBound...]
         guard let endRange = afterStart.range(of: before) else { return nil }
         return String(afterStart[..<endRange.lowerBound])
     }
 
-    private func replaceBetween(_ text: String, after: String, before: String, with replacement: String) -> String {
-        guard let startRange = text.range(of: after) else { return text }
-        let afterStart = text[startRange.upperBound...]
-        guard let endRange = afterStart.range(of: before) else { return text }
-        var result = text
-        let replaceRange = startRange.upperBound..<endRange.lowerBound
-        result.replaceSubrange(replaceRange, with: replacement)
-        return result
+    private func extractTypewriterText(from content: String) -> String? {
+        guard let start = content.range(of: "<Typewriter"),
+              let end = content.range(of: "</Typewriter>") else { return nil }
+        let inner = content[start.upperBound..<end.lowerBound]
+        if let gt = inner.range(of: ">") {
+            return String(inner[gt.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return nil
     }
 
-    private func replaceInHTML(_ text: String, cssClass: String, newInner: String) -> String {
-        let pattern = "(<[^>]*class=\"[^\"]*\(cssClass)[^\"]*\"[^>]*>)([^<]*)(</[^>]+>)"
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { return text }
-        let ns = text as NSString
-        let range = NSRange(location: 0, length: ns.length)
-        if let match = regex.firstMatch(in: text, range: range), match.numberOfRanges > 3 {
-            let openTag = ns.substring(with: match.range(at: 1))
-            let closeTag = ns.substring(with: match.range(at: 3))
-            let replacement = "\(openTag)\(newInner)\(closeTag)"
-            return regex.stringByReplacingMatches(in: text, range: range, withTemplate: replacement)
+    private func extractHeroDescription(from content: String) -> String? {
+        guard let start = content.range(of: "blog-hero-sub\">"),
+              let end = content.range(of: "</p>", range: start.upperBound..<content.endIndex) else { return nil }
+        let raw = String(content[start.upperBound..<end.lowerBound])
+        return raw
+            .replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "<b>", with: "")
+            .replacingOccurrences(of: "</b>", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func extractAboutDescription(from content: String) -> String? {
+        guard let h3End = content.range(of: "</h3>"),
+              let pStart = content.range(of: "<p>", range: h3End.upperBound..<content.endIndex),
+              let pEnd = content.range(of: "</p>", range: pStart.upperBound..<content.endIndex) else { return nil }
+        return String(content[pStart.upperBound..<pEnd.lowerBound])
+            .replacingOccurrences(of: "\n", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func extractArrayBlock(in content: String, marker: String) -> String? {
+        guard let start = content.range(of: marker) else { return nil }
+        let afterStart = content[start.lowerBound...]
+        guard let openBracket = afterStart.range(of: "["), let closeBracket = afterStart.range(of: "];") else { return nil }
+        return String(content[start.lowerBound..<closeBracket.upperBound])
+    }
+
+    private func parseSkills(from content: String) -> [SkillItem] {
+        guard let block = extractArrayBlock(in: content, marker: "const skills:") else { return [] }
+        var items: [SkillItem] = []
+        let pattern = #"\{\s*name:\s*"([^"]+)"\s*,\s*color:\s*"([^"]+)"\s*\}"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
+        let ns = block as NSString
+        for match in regex.matches(in: block, range: NSRange(location: 0, length: ns.length)) {
+            if match.numberOfRanges > 2 {
+                items.append(SkillItem(
+                    name: ns.substring(with: match.range(at: 1)),
+                    color: ns.substring(with: match.range(at: 2))
+                ))
+            }
         }
-        return text
+        return items
+    }
+
+    private func parseStats(from content: String) -> [StatItem] {
+        guard let block = extractArrayBlock(in: content, marker: "const stats:") else { return [] }
+        var items: [StatItem] = []
+        let pattern = #"\{\s*label:\s*"([^"]+)"\s*,\s*value:\s*"([^"]+)"\s*,\s*color:\s*"([^"]+)"\s*\}"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
+        let ns = block as NSString
+        for match in regex.matches(in: block, range: NSRange(location: 0, length: ns.length)) {
+            if match.numberOfRanges > 3 {
+                items.append(StatItem(
+                    label: ns.substring(with: match.range(at: 1)),
+                    value: ns.substring(with: match.range(at: 2)),
+                    color: ns.substring(with: match.range(at: 3))
+                ))
+            }
+        }
+        return items
+    }
+
+    private func parseFAQs(from content: String) -> [FAQItem] {
+        var items: [FAQItem] = []
+        let pattern = #"question="([^"]+)"\s*\n\s*answer="([^"]+)""#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
+        let ns = content as NSString
+        for match in regex.matches(in: content, range: NSRange(location: 0, length: ns.length)) {
+            if match.numberOfRanges > 2 {
+                items.append(FAQItem(
+                    question: ns.substring(with: match.range(at: 1)),
+                    answer: ns.substring(with: match.range(at: 2))
+                ))
+            }
+        }
+        return items
     }
 }
 
