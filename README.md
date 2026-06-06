@@ -1,8 +1,33 @@
 # NookDesk 🏝️
 
-**动森风格博客管理工作台** — 配合 [animal-island-blog](https://github.com/sexyfeifan/animal-island-blog) 博客系统使用
+**动森风格博客管理工作台** — 配合 [animal-island-blog](https://github.com/guokaigdg/animal-island-blog) 博客系统使用
 
 一款 macOS 桌面应用，让你用动森风格的界面管理你的博客。支持文章创建/编辑、页面内容修改、一键发布到 GitHub Pages。
+
+## 📋 三个仓库的关系
+
+| 仓库 | 作用 | 说明 |
+|------|------|------|
+| [animal-island-blog](https://github.com/guokaigdg/animal-island-blog) | 博客模板 | 原始项目，包含博客的完整代码（React 19 + Vite + 动森风格 UI） |
+| `你的用户名.github.io` | 你的博客 | Fork 模板后，这是你的博客数据仓库，包含你的文章和配置 |
+| [NookDesk](https://github.com/sexyfeifan/NookDesk) | 博客管理软件 | macOS 桌面应用，用于管理你的博客（创建文章、编辑页面、发布） |
+
+**关系图：**
+```
+animal-island-blog (模板)
+    ↓ fork
+你的用户名.github.io (你的博客数据)
+    ↑ 管理
+NookDesk (桌面管理软件)
+```
+
+**使用流程：**
+1. Fork `animal-island-blog` 到你的 GitHub 账号，重命名为 `你的用户名.github.io`
+2. 安装 NookDesk，配置指向你的博客仓库
+3. 在 NookDesk 中写作、编辑、发布
+4. GitHub Actions 自动构建部署到 `你的用户名.github.io`
+
+**关于硬编码：** NookDesk 默认的「恢复」按钮会从 `guokaigdg/animal-island-blog` 原始仓库下载默认文章模板。其他功能（克隆、发布、更新检测）使用你在软件中配置的仓库地址，不绑定特定账号。
 
 ## 📦 下载安装
 
