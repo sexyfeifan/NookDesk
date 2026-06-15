@@ -959,12 +959,12 @@ struct WritingView: View {
                 NookDivider()
 
                 HStack(spacing: 10) {
-                    NookButton(.primary, size: .small, label: "保存") {
+                    NookButton(.default, size: .small, label: "保存") {
                         applyInputsToPost()
                         viewModel.saveCurrentPost()
                     }
 
-                    NookButton(.default, size: .small, label: "保存并发布") {
+                    NookButton(.primary, size: .small, label: "保存并发布") {
                         applyInputsToPost()
                         viewModel.saveCurrentPost()
                         viewModel.runPublish()
@@ -975,7 +975,6 @@ struct WritingView: View {
                     NookButton(.danger, size: .small, label: "删除") {
                         showDeleteConfirm = true
                     }
-
                     Text(viewModel.editorPost.fileURL.lastPathComponent)
                         .font(.custom("Nunito-Regular", size: 11))
                         .foregroundColor(.aiTextMuted)

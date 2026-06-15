@@ -21,11 +21,11 @@ enum MainTab: String, CaseIterable, Identifiable {
 
     var icon: NookIcon {
         switch self {
-        case .writing:  return .design
-        case .pages:    return .map
-        case .publish:  return .helicopter
-        case .settings: return .variant
-        case .logs:     return .chat
+        case .writing:  return .pencil
+        case .pages:    return .docText
+        case .publish:  return .paperplane
+        case .settings: return .gear
+        case .logs:     return .listBullet
         }
     }
 }
@@ -35,26 +35,18 @@ struct NookSidebar: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            VStack(spacing: 6) {
-                HStack(spacing: 8) {
-                    NookIcon.variant.image
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(.aiPrimary)
-                    Text("NookDesk")
-                        .font(.custom("Nunito-Black", size: 20))
-                        .foregroundColor(.aiTextHeader)
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 20)
-                .padding(.bottom, 8)
-
-                Text("v\(AppVersion.current)")
-                    .font(.custom("Nunito-Regular", size: 11))
-                    .foregroundColor(.aiTextMuted)
+            HStack(spacing: 8) {
+                Text("🏝️")
+                    .font(.system(size: 22))
+                Text("NookDesk")
+                    .font(.custom("Nunito-Black", size: 18))
+                    .foregroundColor(.aiTextHeader)
             }
-            .padding(.bottom, 20)
+            .padding(.horizontal, 16)
+            .padding(.top, 24)
+            .padding(.bottom, 24)
 
-            VStack(spacing: 4) {
+            VStack(spacing: 2) {
                 ForEach(MainTab.allCases) { tab in
                     NookSidebarItem(
                         icon: tab.icon,
@@ -70,8 +62,13 @@ struct NookSidebar: View {
             .padding(.horizontal, 10)
 
             Spacer()
+
+            Text("v\(AppVersion.current)")
+                .font(.custom("Nunito-Regular", size: 10))
+                .foregroundColor(.aiTextDisabled)
+                .padding(.bottom, 16)
         }
-        .frame(width: 200)
+        .frame(width: 180)
         .background(Color.aiSecondaryBg)
     }
 }

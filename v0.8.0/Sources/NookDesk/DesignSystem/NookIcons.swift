@@ -11,6 +11,12 @@ enum NookIcon: String, CaseIterable, Identifiable {
     case map
     case shopping
     case variant
+    case pencil
+    case docText
+    case gear
+    case listBullet
+    case tray
+    case paperplane
 
     var id: String { rawValue }
 
@@ -26,6 +32,12 @@ enum NookIcon: String, CaseIterable, Identifiable {
         case .map:         return "map.fill"
         case .shopping:    return "cart.fill"
         case .variant:     return "sparkles"
+        case .pencil:      return "square.and.pencil"
+        case .docText:     return "doc.text.fill"
+        case .gear:        return "gearshape.fill"
+        case .listBullet:  return "list.bullet"
+        case .tray:        return "tray.full.fill"
+        case .paperplane:  return "paperplane.fill"
         }
     }
 
