@@ -179,6 +179,8 @@ final class PostService {
             return renderYAMLFrontMatter(for: post)
         case .json:
             return renderJSONFrontMatter(for: post)
+        case .astro:
+            return renderAstroYAMLFrontMatter(for: post)
         }
     }
 
@@ -190,7 +192,7 @@ final class PostService {
         switch post.frontMatterFormat {
         case .toml:
             return renderDelimitedPost(frontMatter: frontMatter, delimiter: "+++", body: post.body)
-        case .yaml:
+        case .yaml, .astro:
             return renderDelimitedPost(frontMatter: frontMatter, delimiter: "---", body: post.body)
         case .json:
             let trimmed = frontMatter.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -287,7 +289,7 @@ final class PostService {
         case .toml:
             let entries = parseTOMLFrontMatter(frontMatter)
             assign(entries: entries, to: &post)
-        case .yaml:
+        case .yaml, .astro:
             let entries = parseYAMLFrontMatter(frontMatter)
             assign(entries: entries, to: &post)
         case .json:
@@ -298,11 +300,18 @@ final class PostService {
 
     private func assign(entries: [String: Any], to post: inout BlogPost) {
         if let title = stringValue(entries["title"]) { post.title = title }
-        if let dateText = stringValue(entries["date"]), let date = parseDate(dateText) { post.date = date }
+        // Support both Hugo (date) and Astro (pubDate) field names
+        if let dateText = stringValue(entries["date"] ?? entries["pubDate"]), let date = parseDate(dateText) { post.date = date }
         if let draft = boolValue(entries["draft"]) { post.draft = draft }
-        if let summary = stringValue(entries["summary"]) { post.summary = summary }
+        // Support both Hugo (summary) and Astro (description) field names
+        if let summary = stringValue(entries["summary"] ?? entries["description"]) { post.summary = summary }
         if let tags = stringArrayValue(entries["tags"]) { post.tags = tags }
-        if let categories = stringArrayValue(entries["categories"]) { post.categories = categories }
+        // Support both Hugo (categories array) and Astro (category singular) field names
+        if let categories = stringArrayValue(entries["categories"]) {
+            post.categories = categories
+        } else if let category = stringValue(entries["category"]), !category.isEmpty {
+            post.categories = [category]
+        }
         if let pin = boolValue(entries["pin"]) { post.pin = pin }
         if let math = boolValue(entries["math"]) { post.math = math }
         if let mathJax = boolValue(entries["MathJax"] ?? entries["mathJax"]) { post.mathJax = mathJax }
@@ -315,6 +324,10 @@ final class PostService {
         if let url = stringValue(entries["url"]) { post.urlPath = url }
         if let aliases = stringArrayValue(entries["aliases"]) { post.aliases = aliases }
         if let translationKey = stringValue(entries["translationKey"]) { post.translationKey = translationKey }
+        // Astro-specific: readTime, color, heroImage
+        if let readTime = stringValue(entries["readTime"]) { post.customTaxonomies["readTime"] = [readTime] }
+        if let color = stringValue(entries["color"]) { post.customTaxonomies["color"] = [color] }
+        if let heroImage = stringValue(entries["heroImage"]) { post.customTaxonomies["heroImage"] = [heroImage] }
     }
 
     private func resetStructuredFields(on post: inout BlogPost) {
@@ -444,6 +457,40 @@ final class PostService {
         appendOptionalYAMLArray(post.categories, key: "categories", to: &lines)
         appendOptionalYAMLString(post.cover, key: "cover", to: &lines)
         appendOptionalYAMLString(post.slug, key: "slug", to: &lines)
+        return lines.joined(separator: "\n")
+    }
+
+    func renderAstroYAMLFrontMatter(for post: BlogPost) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        var lines: [String] = []
+        lines.append("title: \(encodeYAML(post.title))")
+        lines.append("description: \(encodeYAML(post.summary))")
+        lines.append("pubDate: \(formatter.string(from: post.date))")
+        if let category = post.categories.first, !category.isEmpty {
+            lines.append("category: \(encodeYAML(category))")
+        }
+        if !post.tags.isEmpty {
+            lines.append("tags: [\(post.tags.map { encodeYAML($0) }.joined(separator: ", "))]")
+        }
+        if let cover = post.customTaxonomies["cover"]?.first, !cover.isEmpty {
+            lines.append("cover: \(encodeYAML(cover))")
+        } else if !post.cover.isEmpty {
+            lines.append("cover: \(encodeYAML(post.cover))")
+        }
+        if let color = post.customTaxonomies["color"]?.first, !color.isEmpty {
+            lines.append("color: \(encodeYAML(color))")
+        }
+        if let readTime = post.customTaxonomies["readTime"]?.first, !readTime.isEmpty {
+            lines.append("readTime: \(encodeYAML(readTime))")
+        }
+        if post.draft {
+            lines.append("draft: true")
+        }
+        if post.pin {
+            lines.append("pin: true")
+        }
         return lines.joined(separator: "\n")
     }
 

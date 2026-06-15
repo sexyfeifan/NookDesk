@@ -919,6 +919,11 @@ struct WritingView: View {
         Group {
             NookInput("内容标题", text: $viewModel.newPostTitle)
             NookInput("文件名", text: $viewModel.newPostFileName)
+            if isAstroBackend {
+                Text("格式：Astro YAML (Markdown + frontmatter)")
+                    .font(.custom("Nunito-Regular", size: 11))
+                    .foregroundColor(.aiTextMuted)
+            }
         }
     }
 
@@ -984,7 +989,7 @@ struct WritingView: View {
     private var inspectorPanel: some View {
         NookCard(color: .appYellow) {
             VStack(alignment: .leading, spacing: 12) {
-                Text("文档属性")
+                Text(isAstroBackend ? "文章属性 (Astro)" : "文档属性")
                     .font(.custom("Nunito-Bold", size: 16))
                     .foregroundColor(.aiTextHeader)
 
@@ -996,13 +1001,13 @@ struct WritingView: View {
                             .textFieldStyle(.roundedBorder)
                     }
 
-                    inspectorField("日期") {
+                    inspectorField(isAstroBackend ? "发布日期" : "日期") {
                         DatePicker("", selection: $viewModel.editorPost.date, displayedComponents: [.date, .hourAndMinute])
                             .labelsHidden()
                     }
 
-                    inspectorField("摘要") {
-                        TextField("摘要（可选）", text: $viewModel.editorPost.summary, axis: .vertical)
+                    inspectorField(isAstroBackend ? "描述 (description)" : "摘要") {
+                        TextField(isAstroBackend ? "文章描述..." : "摘要（可选）", text: $viewModel.editorPost.summary, axis: .vertical)
                             .lineLimit(2...4)
                             .textFieldStyle(.roundedBorder)
                     }
@@ -1011,12 +1016,46 @@ struct WritingView: View {
                         tagsEditor
                     }
 
-                    inspectorField("分类") {
+                    inspectorField(isAstroBackend ? "分类 (单选)" : "分类") {
                         categoriesEditor
                     }
 
-                    inspectorField("Slug") {
-                        NookInput("短链接", text: $viewModel.editorPost.slug)
+                    if isAstroBackend {
+                        inspectorField("封面 Emoji") {
+                            TextField("🏝️", text: Binding(
+                                get: { viewModel.editorPost.customTaxonomies["cover"]?.first ?? viewModel.editorPost.cover },
+                                set: { newVal in
+                                    viewModel.editorPost.customTaxonomies["cover"] = [newVal]
+                                    viewModel.editorPost.cover = newVal
+                                }
+                            ))
+                            .textFieldStyle(.roundedBorder)
+                        }
+
+                        inspectorField("卡片颜色") {
+                            Picker("", selection: Binding(
+                                get: { viewModel.editorPost.customTaxonomies["color"]?.first ?? "app-blue" },
+                                set: { viewModel.editorPost.customTaxonomies["color"] = [$0] }
+                            )) {
+                                ForEach(["app-pink","purple","app-blue","app-yellow","app-orange","app-teal","app-green","app-red","lime-green","yellow-green","brown","warm-peach-pink"], id: \.self) { color in
+                                    Text(color).tag(color)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                        }
+
+                        inspectorField("阅读时间") {
+                            TextField("5 分钟", text: Binding(
+                                get: { viewModel.editorPost.customTaxonomies["readTime"]?.first ?? "" },
+                                set: { viewModel.editorPost.customTaxonomies["readTime"] = [$0] }
+                            ))
+                            .textFieldStyle(.roundedBorder)
+                        }
+                    } else {
+                        inspectorField("Slug") {
+                            NookInput("短链接", text: $viewModel.editorPost.slug)
+                        }
                     }
 
                     Toggle("草稿", isOn: $viewModel.editorPost.draft)

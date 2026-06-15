@@ -246,6 +246,10 @@ final class AppViewModel: ObservableObject {
         } catch {
             statusText = error.localizedDescription
         }
+        // Astro-specific defaults
+        if project.backendName.contains("Astro") {
+            newPostFrontMatterFormat = .astro
+        }
         startPreflightMonitor()
         startActionsStatusMonitor()
     }
@@ -1365,17 +1369,26 @@ final class AppViewModel: ObservableObject {
             }
         }
 
-        let postsPath = project.rootURL.appendingPathComponent("content/posts", isDirectory: true).path
-        var isDirectory = ObjCBool(false)
-        if fm.fileExists(atPath: postsPath, isDirectory: &isDirectory), isDirectory.boolValue {
-            project.contentSubpath = "content/posts"
-            return
+        // Astro content directories (priority order)
+        let astroPaths = ["src/content/blog", "src/content/posts", "src/content"]
+        for path in astroPaths {
+            var isDirectory = ObjCBool(false)
+            let fullPath = project.rootURL.appendingPathComponent(path, isDirectory: true).path
+            if fm.fileExists(atPath: fullPath, isDirectory: &isDirectory), isDirectory.boolValue {
+                project.contentSubpath = path
+                return
+            }
         }
 
-        let postPath = project.rootURL.appendingPathComponent("content/post", isDirectory: true).path
-        isDirectory = ObjCBool(false)
-        if fm.fileExists(atPath: postPath, isDirectory: &isDirectory), isDirectory.boolValue {
-            project.contentSubpath = "content/post"
+        // Hugo content directories
+        let hugoPaths = ["content/posts", "content/post"]
+        for path in hugoPaths {
+            var isDirectory = ObjCBool(false)
+            let fullPath = project.rootURL.appendingPathComponent(path, isDirectory: true).path
+            if fm.fileExists(atPath: fullPath, isDirectory: &isDirectory), isDirectory.boolValue {
+                project.contentSubpath = path
+                return
+            }
         }
     }
 

@@ -4,6 +4,7 @@ enum FrontMatterFormat: String, CaseIterable, Codable, Identifiable {
     case toml = "TOML"
     case yaml = "YAML"
     case json = "JSON"
+    case astro = "Astro YAML"
 
     var id: String { rawValue }
 
@@ -15,7 +16,7 @@ enum FrontMatterFormat: String, CaseIterable, Codable, Identifiable {
         switch self {
         case .toml:
             return "+++"
-        case .yaml:
+        case .yaml, .astro:
             return "---"
         case .json:
             return "{"
