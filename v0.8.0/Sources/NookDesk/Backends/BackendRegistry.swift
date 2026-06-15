@@ -5,7 +5,8 @@ final class BackendRegistry: @unchecked Sendable {
 
     let backends: [SSGBuildBackend] = [
         HugoBackend(),
-        ViteBackend()
+        ViteBackend(),
+        AstroBackend()
     ]
 
     private init() {}

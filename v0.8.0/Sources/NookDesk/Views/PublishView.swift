@@ -21,9 +21,6 @@ struct PublishView: View {
 
     private let steps: [(name: String, description: String)] = [
         ("检查项目状态", "验证博客项目配置是否完整"),
-        ("检查 GitHub 配置", "验证远程地址和 Token"),
-        ("检查 Workflow", "确保 GitHub Actions 配置文件存在"),
-        ("检查 Pages 来源", "确保 GitHub Pages 使用 Actions 部署"),
         ("提交并推送", "将所有修改推送到 GitHub"),
         ("等待部署", "GitHub Actions 自动构建并部署"),
     ]
@@ -129,11 +126,8 @@ struct PublishView: View {
     private func stepNumberEmoji(_ index: Int) -> String {
         switch index {
         case 0: return "📋"
-        case 1: return "🔑"
-        case 2: return "⚙️"
-        case 3: return "📄"
-        case 4: return "🚀"
-        case 5: return "⏳"
+        case 1: return "🚀"
+        case 2: return "⏳"
         default: return "📌"
         }
     }
@@ -445,50 +439,21 @@ struct PublishView: View {
     private func executeStep(_ index: Int) async throws -> String {
         switch index {
         case 0:
-            let report = viewModel.preflightChecks().filter { $0.title == "package.json" || $0.title == "vite.config.ts" || $0.title == "posts.ts 文章数据" }
-            let allOk = report.allSatisfy { $0.level == .ok }
-            if allOk {
-                return "项目配置完整。"
+            let report = viewModel.preflightChecks()
+            let critical = report.filter { $0.level == .error }
+            if critical.isEmpty {
+                let okCount = report.filter { $0.level == .ok }.count
+                return "项目配置正常（\(okCount)/\(report.count) 项通过）。"
             } else {
-                let failed = report.filter { $0.level != .ok }.map { $0.title }.joined(separator: ", ")
+                let failed = critical.map { $0.title }.joined(separator: ", ")
                 throw NSError(domain: "PublishStep", code: 0, userInfo: [NSLocalizedDescriptionKey: "缺少：\(failed)"])
             }
 
         case 1:
-            let remote = viewModel.publishRemoteURL.trimmingCharacters(in: .whitespacesAndNewlines)
-            let token = viewModel.githubClassicToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                && viewModel.githubFineGrainedToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            if remote.isEmpty {
-                throw NSError(domain: "PublishStep", code: 1, userInfo: [NSLocalizedDescriptionKey: "未配置远程仓库地址。请在设置中填写 GitHub 仓库 URL。"])
-            }
-            if token {
-                return "远程地址已配置。警告：未配置 GitHub Token，部分功能可能受限。"
-            }
-            return "GitHub 配置正常。"
-
-        case 2:
-            if viewModel.hasGitHubPagesWorkflow {
-                return "Workflow 文件已存在。"
-            } else {
-                viewModel.bootstrapGitHubPagesWorkflow()
-                return "正在生成 Workflow..."
-            }
-
-        case 3:
-            if let site = viewModel.pagesSiteStatus {
-                if site.buildType.lowercased() == "workflow" {
-                    return "Pages 来源已配置为 GitHub Actions。"
-                } else {
-                    throw NSError(domain: "PublishStep", code: 3, userInfo: [NSLocalizedDescriptionKey: "当前 Pages 来源为 \(site.buildType)，建议切换为 GitHub Actions。请在高级选项中修复。"])
-                }
-            }
-            return "Pages 来源尚未检测，请先配置 GitHub Token 后重试。"
-
-        case 4:
             viewModel.runPublish()
             return "提交并推送操作已启动。"
 
-        case 5:
+        case 2:
             viewModel.refreshActionsStatus()
             if let run = viewModel.latestWorkflowStatus {
                 return "最新状态：\(run.statusText)"

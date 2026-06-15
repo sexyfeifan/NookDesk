@@ -43,6 +43,10 @@ struct WritingView: View {
         viewModel.project.backendName.contains("Vite")
     }
 
+    private var isAstroBackend: Bool {
+        viewModel.project.backendName.contains("Astro")
+    }
+
     var body: some View {
         if isViteBackend {
             tsWritingBody
