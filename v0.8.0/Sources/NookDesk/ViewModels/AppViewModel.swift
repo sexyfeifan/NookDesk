@@ -102,7 +102,9 @@ final class AppViewModel: ObservableObject {
         self.editorPost = BlogPost.empty(in: project.contentURL)
         self.newPostTitle = ""
         self.newPostFileName = "new-post.md"
-        loadAll()
+        DispatchQueue.main.async { [weak self] in
+            self?.loadAll()
+        }
     }
 
     deinit {

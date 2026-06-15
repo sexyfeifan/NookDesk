@@ -6,7 +6,9 @@ struct NookDeskApp: App {
     @StateObject private var viewModel = AppViewModel()
 
     init() {
-        NSApp.appearance = NSAppearance(named: .aqua)
+        if let aqua = NSAppearance(named: .aqua) {
+            NSApp.appearance = aqua
+        }
     }
 
     var body: some Scene {
