@@ -29,6 +29,18 @@ extension Color {
 
     static let aiShadowBtn = Color(red: 0.741, green: 0.682, blue: 0.627)
     static let aiShadowInput = Color(red: 0.831, green: 0.788, blue: 0.702)
+
+    static let aiDivider = Color(red: 0.847, green: 0.816, blue: 0.765)
+    static let aiInputBg = Color.white
+    static let aiSwitchOn = Color(red: 0.525, green: 0.839, blue: 0.478)
+    static let aiSwitchHandle = Color.white
+    static let aiSidebarActive = Color(red: 0.718, green: 0.776, blue: 0.898)
+    static let aiSidebarHover = Color(red: 0.839, green: 0.875, blue: 0.941)
+    static let aiSea = Color(red: 0.686, green: 0.847, blue: 0.902)
+    static let aiForest = Color(red: 0.302, green: 0.690, blue: 0.557)
+    static let aiLeafFill = Color(red: 0.3, green: 0.69, blue: 0.56)
+    static let aiLeafStem = Color(red: 0.45, green: 0.32, blue: 0.22)
+    static let aiDangerShadow = Color(red: 0.7, green: 0.25, blue: 0.25)
 }
 
 // MARK: - NookPhone Card Colors

@@ -155,7 +155,7 @@ struct PageEditorView: View {
                     VStack(spacing: 6) {
                         HStack(spacing: 6) {
                             TextField("emoji", text: $astroProjects[idx].emoji)
-                                .frame(width: 40)
+                                .frame(width: 50)
                                 .textFieldStyle(.roundedBorder)
                             TextField("项目名", text: $astroProjects[idx].name)
                                 .textFieldStyle(.roundedBorder)
@@ -198,23 +198,28 @@ struct PageEditorView: View {
                 NookDivider()
 
                 ForEach(astroFriends.indices, id: \.self) { idx in
-                    HStack(spacing: 6) {
-                        TextField("头像(emoji或URL)", text: $astroFriends[idx].avatar)
-                            .frame(width: 100)
-                            .textFieldStyle(.roundedBorder)
-                        TextField("名称", text: $astroFriends[idx].name)
-                            .textFieldStyle(.roundedBorder)
-                        TextField("描述", text: $astroFriends[idx].description)
-                            .textFieldStyle(.roundedBorder)
+                    VStack(spacing: 4) {
+                        HStack(spacing: 6) {
+                            TextField("🤝", text: $astroFriends[idx].avatar)
+                                .frame(width: 50)
+                                .textFieldStyle(.roundedBorder)
+                            TextField("名称", text: $astroFriends[idx].name)
+                                .textFieldStyle(.roundedBorder)
+                            TextField("描述", text: $astroFriends[idx].description)
+                                .textFieldStyle(.roundedBorder)
+                            Button {
+                                astroFriends.remove(at: idx)
+                            } label: {
+                                Image(systemName: "minus.circle").foregroundColor(.aiError)
+                            }
+                            .buttonStyle(.plain)
+                        }
                         TextField("URL", text: $astroFriends[idx].url)
                             .textFieldStyle(.roundedBorder)
-                        Button {
-                            astroFriends.remove(at: idx)
-                        } label: {
-                            Image(systemName: "minus.circle").foregroundColor(.aiError)
-                        }
-                        .buttonStyle(.plain)
                     }
+                    .padding(6)
+                    .background(Color.aiBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
 
                 saveButton { saveAstroFriends() }

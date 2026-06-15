@@ -84,7 +84,7 @@ struct NookButton: View {
         case .primary:  return .aiShadowBtn
         case .default:  return .aiShadowBtn
         case .ghost:    return .clear
-        case .danger:   return Color(red: 0.7, green: 0.25, blue: 0.25)
+        case .danger:   return .aiDangerShadow
         }
     }
 
@@ -192,7 +192,8 @@ struct NookInput: View {
             .foregroundColor(.aiTextBody)
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .background(Color.white)
+            .frame(maxWidth: .infinity)
+            .background(Color.aiInputBg)
             .clipShape(RoundedRectangle(cornerRadius: 50, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 50, style: .continuous)
@@ -222,11 +223,11 @@ struct NookSwitch: View {
         } label: {
             ZStack(alignment: isOn ? .trailing : .leading) {
                 Capsule()
-                    .fill(isOn ? Color(red: 0.525, green: 0.839, blue: 0.478) : Color.aiBorderLight)
+                    .fill(isOn ? Color.aiSwitchOn : Color.aiBorderLight)
                     .frame(width: width, height: height)
 
                 Circle()
-                    .fill(Color.white)
+                    .fill(Color.aiSwitchHandle)
                     .frame(width: handleSize, height: handleSize)
                     .shadow(color: .black.opacity(0.15), radius: 1, y: 1)
                     .padding(3)
@@ -275,7 +276,7 @@ struct NookSection<Content: View>: View {
 struct NookDivider: View {
     var body: some View {
         Rectangle()
-            .fill(Color(red: 0.847, green: 0.816, blue: 0.765))
+            .fill(Color.aiDivider)
             .frame(height: 1)
     }
 }
@@ -370,8 +371,8 @@ struct NookSidebarItem: View {
     }
 
     private var backgroundColor: Color {
-        if isActive { return Color(red: 0.718, green: 0.776, blue: 0.898) }
-        if isHovered { return Color(red: 0.839, green: 0.875, blue: 0.941) }
+        if isActive { return Color.aiSidebarActive }
+        if isHovered { return Color.aiSidebarHover }
         return .clear
     }
 
@@ -459,18 +460,18 @@ struct NookFooter: View {
     private var waveColor: Color {
         switch style {
         case .sea:
-            return Color(red: 0.4, green: 0.76, blue: 0.74)
+            return .aiSea
         case .forest:
-            return Color(red: 0.53, green: 0.73, blue: 0.53)
+            return .aiForest
         }
     }
 
     private var footerBackgroundColor: Color {
         switch style {
         case .sea:
-            return Color(red: 0.4, green: 0.76, blue: 0.74).opacity(0.15)
+            return Color.aiSea.opacity(0.15)
         case .forest:
-            return Color(red: 0.53, green: 0.73, blue: 0.53).opacity(0.15)
+            return Color.aiForest.opacity(0.15)
         }
     }
 }
@@ -495,7 +496,7 @@ struct NookWaveDivider: View {
                 )
             }
 
-            context.stroke(path, with: .color(Color(red: 0.847, green: 0.816, blue: 0.765)), lineWidth: 1.5)
+            context.stroke(path, with: .color(Color.aiDivider), lineWidth: 1.5)
         }
         .frame(height: 12)
         .frame(maxWidth: .infinity)
@@ -630,12 +631,12 @@ struct NookLeafIcon: View {
             )
             leaf.closeSubpath()
 
-            context.fill(leaf, with: .color(Color(red: 0.3, green: 0.69, blue: 0.56)))
+            context.fill(leaf, with: .color(Color.aiLeafFill))
 
             var stem = Path()
             stem.move(to: CGPoint(x: w * 0.5, y: h * 0.45))
             stem.addLine(to: CGPoint(x: w * 0.5, y: h * 0.95))
-            context.stroke(stem, with: .color(Color(red: 0.45, green: 0.32, blue: 0.22)), lineWidth: 2)
+            context.stroke(stem, with: .color(Color.aiLeafStem), lineWidth: 2)
 
             var vein = Path()
             vein.move(to: CGPoint(x: w * 0.5, y: h * 0.45))
@@ -644,7 +645,7 @@ struct NookLeafIcon: View {
             vein.addLine(to: CGPoint(x: w * 0.7, y: h * 0.45))
             vein.move(to: CGPoint(x: w * 0.5, y: h * 0.65))
             vein.addLine(to: CGPoint(x: w * 0.35, y: h * 0.58))
-            context.stroke(vein, with: .color(Color(red: 0.45, green: 0.32, blue: 0.22).opacity(0.5)), lineWidth: 1)
+            context.stroke(vein, with: .color(Color.aiLeafStem.opacity(0.5)), lineWidth: 1)
         }
         .frame(width: size, height: size)
     }

@@ -43,7 +43,7 @@ struct RootView: View {
             )
 
             Rectangle()
-                .fill(Color(red: 0.847, green: 0.816, blue: 0.765))
+                .fill(Color.aiDivider)
                 .frame(width: 1)
 
             VStack(spacing: 0) {

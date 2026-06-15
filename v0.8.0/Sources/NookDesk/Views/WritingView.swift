@@ -476,7 +476,7 @@ struct WritingView: View {
                                     }
                                 ), font: .systemFont(ofSize: 13), minHeight: 60)
                                 .padding(4)
-                                .background(Color.white)
+                                .background(Color.aiInputBg)
                                 .clipShape(RoundedRectangle(cornerRadius: 8))
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 8)

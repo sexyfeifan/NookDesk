@@ -345,7 +345,7 @@ struct MarkdownTextEditor: NSViewRepresentable {
         textView.isAutomaticTextReplacementEnabled = false
         textView.font = .monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
         textView.string = text
-        textView.backgroundColor = .clear
+        textView.backgroundColor = .textBackgroundColor
         textView.textContainerInset = NSSize(width: 10, height: 10)
         textView.markdownActionHandler = context.coordinator
         textView.setSelectedRange(selection)
@@ -355,7 +355,7 @@ struct MarkdownTextEditor: NSViewRepresentable {
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
         scrollView.autohidesScrollers = true
-        scrollView.drawsBackground = false
+        scrollView.drawsBackground = true
         scrollView.documentView = textView
 
         context.coordinator.textView = textView

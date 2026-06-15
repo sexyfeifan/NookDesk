@@ -170,7 +170,7 @@ struct PublishView: View {
 
                 TextField("提交信息", text: $viewModel.publishMessage)
                     .textFieldStyle(.roundedBorder)
-                    .frame(maxWidth: 400)
+                    .frame(maxWidth: 600)
 
                 NookButton(.primary, size: .large, icon: "paperplane.fill", label: "一键发布") {
                     showPublishProgress = true
