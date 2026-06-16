@@ -794,11 +794,11 @@ final class AppViewModel: ObservableObject {
     }
 
     private func saveEditorPostIfNeeded() throws {
-        guard project.backendName == "Hugo" else { return }
         let hasContent = !editorPost.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             || !editorPost.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             || FileManager.default.fileExists(atPath: editorPost.fileURL.path)
         if hasContent {
+            editorPost.rawFrontMatter = postService.renderFrontMatter(for: editorPost)
             try postService.savePost(editorPost)
         }
     }

@@ -1,5 +1,9 @@
 import SwiftUI
 
+extension Notification.Name {
+    static let switchToWritingTab = Notification.Name("switchToWritingTab")
+}
+
 struct RootView: View {
     @ObservedObject var viewModel: AppViewModel
     @State private var selectedTab: MainTab = .writing

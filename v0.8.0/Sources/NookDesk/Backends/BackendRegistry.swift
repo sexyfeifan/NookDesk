@@ -4,8 +4,6 @@ final class BackendRegistry: @unchecked Sendable {
     static let shared = BackendRegistry()
 
     let backends: [SSGBuildBackend] = [
-        HugoBackend(),
-        ViteBackend(),
         AstroBackend()
     ]
 

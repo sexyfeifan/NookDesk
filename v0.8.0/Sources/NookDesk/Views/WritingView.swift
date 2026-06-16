@@ -7,763 +7,43 @@ struct WritingView: View {
     @State private var tagsInput = ""
     @State private var categoriesInput = ""
     @State private var editorSelection = NSRange(location: 0, length: 0)
-    @State private var imageAltText = ""
     @State private var showDeleteConfirm = false
     @State private var showingAIWritingSheet = false
     @State private var aiWritingSourceText = ""
     @State private var selectedWorkspacePickerCode = ""
 
-    private let tsPostService = TypeScriptPostService()
-    @State private var tsPosts: [TSPPost] = []
-    @State private var selectedTSPostID: String?
-    @State private var editingTSPost: TSPPost?
-    @State private var tsStatusMessage = ""
-    @State private var showTSDeleteConfirm = false
-    @State private var newTSTitle = ""
-    @State private var expandedSections: Set<Int> = []
-
-    private let colorOptions: [(String, String)] = [
-        ("app-pink", "粉色"),
-        ("purple", "紫色"),
-        ("app-blue", "蓝色"),
-        ("app-yellow", "黄色"),
-        ("app-orange", "橙色"),
-        ("app-teal", "青色"),
-        ("app-green", "绿色"),
-        ("app-red", "红色"),
-        ("lime-green", "青柠"),
-        ("yellow-green", "黄绿"),
-        ("brown", "棕色"),
-        ("warm-peach-pink", "暖桃"),
-    ]
-
-    private let tagOptions = ["Blog", "技术", "生活", "设计", "工具", "AI", "思考"]
-
-    private var isViteBackend: Bool {
-        viewModel.project.backendName.contains("Vite")
-    }
-
-    private var isAstroBackend: Bool {
-        viewModel.project.backendName.contains("Astro")
-    }
-
     var body: some View {
-        if isViteBackend {
-            tsWritingBody
-        } else {
-            hugoWritingBody
-        }
-    }
-
-    // MARK: - TS Writing (Vite/TypeScript Backend)
-
-    private var tsWritingBody: some View {
-        NavigationSplitView {
-            tsSidebarContent
-                .navigationTitle("文章")
-                .navigationSplitViewColumnWidth(min: 220, ideal: 280, max: 340)
-        } detail: {
-            tsDetailContent
-                .onAppear { loadTSPosts() }
-                .alert("确认删除？", isPresented: $showTSDeleteConfirm) {
-                    Button("删除", role: .destructive) { deleteSelectedTSPost() }
-                    Button("取消", role: .cancel) {}
-                } message: {
-                    Text(editingTSPost?.title ?? "")
-                }
-                .sheet(isPresented: $showingAIWritingSheet) {
-                    aiWritingSheet
-                }
-        }
-    }
-
-    // MARK: - Markdown Writing (Hugo/Astro Backend)
-
-    private var hugoWritingBody: some View {
         NavigationSplitView(columnVisibility: editorColumnVisibility) {
             sidebarContent
-                .navigationTitle("内容")
                 .navigationSplitViewColumnWidth(min: 220, ideal: 280, max: 340)
-                .onChange(of: viewModel.selectedPostID) { _ in
-                    viewModel.loadSelectedPost()
-                    viewModel.cancelLivePreviewRefresh()
-                    editorSelection = NSRange(location: 0, length: 0)
-                    refreshInputsFromPost()
-                }
         } detail: {
             detailContent
-                .onAppear { refreshInputsFromPost() }
-                .onDisappear { viewModel.cancelLivePreviewRefresh() }
-                .onChange(of: viewModel.newPostTitle) { _ in viewModel.updateSuggestedFileName() }
-                .onChange(of: viewModel.frontMatterEditorMode) { mode in
-                    if mode == .raw {
-                        applyInputsToPost()
-                        viewModel.syncRawFrontMatterFromStructured()
-                    } else {
-                        viewModel.syncStructuredFieldsFromRaw()
-                        refreshInputsFromPost()
-                    }
-                }
-                .onChange(of: viewModel.editorPost.frontMatterFormat) { _ in
-                    if viewModel.frontMatterEditorMode == .raw {
-                        viewModel.syncRawFrontMatterFromStructured()
-                    }
-                }
-                .alert("确认删除？", isPresented: $showDeleteConfirm) {
-                    Button("删除", role: .destructive) {
-                        viewModel.deleteCurrentPost()
-                        editorSelection = NSRange(location: 0, length: 0)
-                        refreshInputsFromPost()
-                    }
-                    Button("取消", role: .cancel) {}
-                } message: {
-                    Text(viewModel.editorPost.displayFileName)
-                }
-                .sheet(isPresented: $showingAIWritingSheet) {
-                    aiWritingSheet
-                }
+                .navigationSplitViewColumnWidth(min: 600, ideal: 800, max: .infinity)
+        }
+        .navigationSplitViewStyle(.balanced)
+        .onAppear { refreshInputsFromPost() }
+        .onChange(of: viewModel.selectedPostID) { _ in refreshInputsFromPost() }
+        .onChange(of: viewModel.editorPost.tags) { _ in refreshInputsFromPost() }
+        .onChange(of: viewModel.editorPost.categories) { _ in refreshInputsFromPost() }
+        .sheet(isPresented: $showingAIWritingSheet) { aiWritingSheet }
+        .alert("确认删除", isPresented: $showDeleteConfirm) {
+            Button("取消", role: .cancel) {}
+            Button("删除", role: .destructive) { viewModel.deleteCurrentPost() }
+        } message: {
+            Text("确定要删除「\(viewModel.editorPost.title)」吗？此操作不可撤销。")
         }
     }
 
-    // MARK: - TS Sidebar
-
-    private var tsSidebarContent: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text("文章列表")
-                    .font(.custom("Nunito-Bold", size: 13))
-                    .foregroundColor(.aiTextSecondary)
-                Spacer()
-                NookButton(.primary, size: .small, label: "+ 新文章") {
-                    let newPost = tsPostService.makeNewPost(title: "未命名文章")
-                    do {
-                        tsPosts = try tsPostService.addPost(newPost, to: viewModel.project)
-                        selectedTSPostID = newPost.id
-                        editingTSPost = newPost
-                        expandedSections = []
-                        tsStatusMessage = "已创建新文章。"
-                        viewModel.log(category: "写作", action: "新建文章", detail: "标题: \(newPost.title)")
-                    } catch {
-                        tsStatusMessage = "创建失败：\(error.localizedDescription)"
-                        viewModel.log(category: "写作", action: "新建文章", detail: "失败: \(error.localizedDescription)", success: false)
-                    }
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-
-            HStack(spacing: 6) {
-                NookButton(.default, size: .small, label: "读取本地") {
-                    loadTSPosts()
-                }
-                NookButton(.default, size: .small, label: "拉取") {
-                    Task {
-                        do {
-                            try viewModel.syncRemoteForPosts()
-                            loadTSPosts()
-                            tsStatusMessage = "已拉取最新代码并刷新。\n路径: \(tsPostService.postsFilePath(in: viewModel.project).path)"
-                            viewModel.log(category: "系统", action: "拉取远程", detail: "拉取成功")
-                        } catch {
-                            tsStatusMessage = "拉取失败：\(error.localizedDescription)"
-                            viewModel.log(category: "系统", action: "拉取远程", detail: "失败: \(error.localizedDescription)", success: false)
-                        }
-                    }
-                }
-                NookButton(.default, size: .small, label: "恢复") {
-                    Task {
-                        do {
-                            tsPosts = try await tsPostService.restoreFromGit(project: viewModel.project)
-                            if let first = tsPosts.first {
-                                selectedTSPostID = first.id
-                                editingTSPost = first
-                                expandedSections = []
-                            }
-                            tsStatusMessage = "已从 Git 恢复 \(tsPosts.count) 篇文章。\n路径: \(tsPostService.postsFilePath(in: viewModel.project).path)"
-                            viewModel.log(category: "系统", action: "恢复文章", detail: "从 Git 恢复 \(tsPosts.count) 篇文章")
-                        } catch {
-                            tsStatusMessage = "恢复失败：\(error.localizedDescription)"
-                            viewModel.log(category: "系统", action: "恢复文章", detail: "失败: \(error.localizedDescription)", success: false)
-                        }
-                    }
-                }
-                Spacer()
-            }
-            .padding(.horizontal, 12)
-            .padding(.bottom, 6)
-
-            NookDivider()
-
-            if tsPosts.isEmpty {
-                NookEmptyState(
-                    icon: .design,
-                    title: "还没有文章",
-                    subtitle: "点击上方按钮创建第一篇文章"
-                )
-            } else {
-                List(tsPosts, selection: $selectedTSPostID) { post in
-                    Button {
-                        selectedTSPostID = post.id
-                        editingTSPost = post
-                        expandedSections = []
-                        viewModel.log(category: "写作", action: "切换文章", detail: "标题: \(post.title)")
-                    } label: {
-                        HStack(spacing: 8) {
-                            Text(post.cover.isEmpty ? "📄" : post.cover)
-                                .font(.system(size: 16))
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(post.title.isEmpty ? "未命名" : post.title)
-                                    .font(.custom("Nunito-SemiBold", size: 13))
-                                    .foregroundColor(post.id == selectedTSPostID ? .aiTextHeader : .aiTextBody)
-                                    .lineLimit(1)
-                                HStack(spacing: 6) {
-                                    Text(post.date)
-                                        .font(.custom("Nunito-Regular", size: 10))
-                                    if !post.tag.isEmpty {
-                                        Text("#\(post.tag)")
-                                            .font(.custom("Nunito-Regular", size: 10))
-                                    }
-                                }
-                                .foregroundColor(.aiTextMuted)
-                            }
-                            Spacer()
-                        }
-                        .padding(.vertical, 4)
-                        .padding(.horizontal, 6)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(post.id == selectedTSPostID ? Color.aiPrimary.opacity(0.12) : Color.clear)
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .tag(post.id)
-                }
-            }
-
-            Spacer()
-
-            if !tsStatusMessage.isEmpty {
-                Text(tsStatusMessage)
-                    .font(.custom("Nunito-Regular", size: 11))
-                    .foregroundColor(.aiTextMuted)
-                    .padding(8)
-                    .lineLimit(3)
-            }
-        }
-    }
-
-    // MARK: - TS Detail (Form-based editor)
-
-    private var tsDetailContent: some View {
-        VStack(spacing: 0) {
-            if let post = editingTSPost {
-                ScrollView {
-                    VStack(spacing: 16) {
-                        tsBasicInfoSection(post: post)
-                            .frame(maxWidth: .infinity)
-                        tsContentSections(post: post)
-                            .frame(maxWidth: .infinity)
-                        tsTakeawaysSection(post: post)
-                            .frame(maxWidth: .infinity)
-                        tsActionBar(post: post)
-                            .frame(maxWidth: .infinity)
-                    }
-                    .padding()
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                tsStatusBar(post: post)
-            } else {
-                NookEmptyState(
-                    icon: .design,
-                    title: "选择一篇文章",
-                    subtitle: "从左侧列表选择或创建新文章\n\n1. 点击「+ 新文章」创建\n2. 填写标题、摘要等基本信息\n3. 添加章节和段落\n4. 点击「保存并发布」推送博客"
-                )
-            }
-        }
-        .onChange(of: editingTSPost?.title) { newTitle in
-            syncSidebarPost(field: \.title, value: newTitle ?? "")
-        }
-        .onChange(of: editingTSPost?.tag) { newTag in
-            syncSidebarPost(field: \.tag, value: newTag ?? "")
-        }
-        .onChange(of: editingTSPost?.date) { newDate in
-            syncSidebarPost(field: \.date, value: newDate ?? "")
-        }
-        .onChange(of: editingTSPost?.excerpt) { newExcerpt in
-            syncSidebarPost(field: \.excerpt, value: newExcerpt ?? "")
-        }
-        .onChange(of: editingTSPost?.color) { newColor in
-            syncSidebarPost(field: \.color, value: newColor ?? "app-blue")
-        }
-        .onChange(of: editingTSPost?.cover) { newCover in
-            syncSidebarPost(field: \.cover, value: newCover ?? "")
-        }
-        .onChange(of: editingTSPost?.readTime) { newReadTime in
-            syncSidebarPost(field: \.readTime, value: newReadTime ?? "")
-        }
-    }
-
-    // MARK: - Basic Info Section
-
-    private func tsBasicInfoSection(post: TSPPost) -> some View {
-        NookCard(color: .appBlue) {
-            VStack(alignment: .leading, spacing: 12) {
-                NookSection("📝 基本信息", subtitle: "文章的元数据信息") {
-                    VStack(alignment: .leading, spacing: 10) {
-                        tsFormField("标题", description: "文章的显示标题") {
-                            TextField("输入标题...", text: bindingTSTitle())
-                                .textFieldStyle(.roundedBorder)
-                        }
-
-                        tsFormField("摘要", description: "文章的简短描述，显示在列表中") {
-                            TextField("输入摘要...", text: bindingTSExcerpt(), axis: .vertical)
-                                .lineLimit(2...4)
-                                .textFieldStyle(.roundedBorder)
-                        }
-
-                        tsFormField("日期", description: "发布日期，格式 yyyy-MM-dd") {
-                            TextField("2026-06-06", text: bindingTSDate())
-                                .textFieldStyle(.roundedBorder)
-                        }
-
-                        tsFormField("标签", description: "文章分类标签") {
-                            Picker("", selection: bindingTSTag()) {
-                                ForEach(tagOptions, id: \.self) { tag in
-                                    Text(tag).tag(tag)
-                                }
-                            }
-                            .labelsHidden()
-                            .pickerStyle(.menu)
-                        }
-
-                        tsFormField("颜色", description: "文章卡片主题色") {
-                            Picker("", selection: bindingTSColor()) {
-                                ForEach(colorOptions, id: \.0) { option in
-                                    HStack(spacing: 6) {
-                                        Circle()
-                                            .fill(NookColor.fromBlogValue(option.0).color)
-                                            .frame(width: 12, height: 12)
-                                        Text(option.1)
-                                    }
-                                    .tag(option.0)
-                                }
-                            }
-                            .labelsHidden()
-                            .pickerStyle(.menu)
-                        }
-
-                        tsFormField("封面", description: "文章封面图标（Emoji）") {
-                            TextField("📝", text: bindingTSCover())
-                                .textFieldStyle(.roundedBorder)
-                        }
-
-                        tsFormField("阅读时间", description: "预计阅读所需时间") {
-                            TextField("5 分钟", text: bindingTSReadTime())
-                                .textFieldStyle(.roundedBorder)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // MARK: - Content Sections
-
-    private func tsContentSections(post: TSPPost) -> some View {
-        NookCard(color: .appTeal) {
-            VStack(alignment: .leading, spacing: 12) {
-                NookSection("📖 正文内容", subtitle: "博客文章的实际渲染内容，每个章节包含标题和段落") {
-                    if post.sections.isEmpty {
-                        Text("暂无章节，点击下方按钮添加。")
-                            .font(.custom("Nunito-Regular", size: 13))
-                            .foregroundColor(.aiTextMuted)
-                            .padding(.vertical, 8)
-                    }
-
-                    ForEach(Array(post.sections.enumerated()), id: \.offset) { idx, section in
-                        tsSectionCard(section: section, index: idx)
-                    }
-
-                    NookButton(.default, size: .small, label: "+ 添加章节") {
-                        guard var p = editingTSPost else { return }
-                        let newSection = TSPSection(heading: "新章节", paragraphs: [""])
-                        p.sections.append(newSection)
-                        editingTSPost = p
-                        expandedSections.insert(p.sections.count - 1)
-                        viewModel.log(category: "写作", action: "添加章节", detail: "章节 \(p.sections.count)")
-                    }
-                }
-            }
-        }
-    }
-
-    private func tsSectionCard(section: TSPSection, index: Int) -> some View {
-        let isExpanded = expandedSections.contains(index)
-        return NookCard(color: .appGreen) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Button {
-                        if isExpanded {
-                            expandedSections.remove(index)
-                        } else {
-                            expandedSections.insert(index)
-                        }
-                        viewModel.log(category: "写作", action: isExpanded ? "折叠章节" : "展开章节", detail: "章节 \(index + 1)")
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundColor(.aiTextSecondary)
-                            Text("章节 \(index + 1)")
-                                .font(.custom("Nunito-Bold", size: 13))
-                                .foregroundColor(.aiTextHeader)
-                        }
-                    }
-                    .buttonStyle(.plain)
-
-                    Spacer()
-
-                    Button {
-                        guard var p = editingTSPost else { return }
-                        p.sections.remove(at: index)
-                        editingTSPost = p
-                        let newExpanded = expandedSections.compactMap { idx -> Int? in
-                            if idx == index { return nil }
-                            if idx > index { return idx - 1 }
-                            return idx
-                        }
-                        expandedSections = Set(newExpanded)
-                        viewModel.log(category: "写作", action: "删除章节", detail: "章节 \(index + 1)")
-                    } label: {
-                        Image(systemName: "trash")
-                            .font(.system(size: 11))
-                            .foregroundColor(.aiError)
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                if isExpanded {
-                    VStack(alignment: .leading, spacing: 8) {
-                        tsFormField("标题", description: "章节标题") {
-                            TextField("章节标题...", text: Binding(
-                                get: { section.heading },
-                                set: { newHeading in
-                                    guard var p = editingTSPost else { return }
-                                    p.sections[index].heading = newHeading
-                                    editingTSPost = p
-                                }
-                            ))
-                            .textFieldStyle(.roundedBorder)
-                            .font(.custom("Nunito-SemiBold", size: 13))
-                        }
-
-                        Text("段落")
-                            .font(.custom("Nunito-SemiBold", size: 12))
-                            .foregroundColor(.aiTextSecondary)
-                        Text("每个段落将渲染为 <p> 标签")
-                            .font(.custom("Nunito-Regular", size: 11))
-                            .foregroundColor(.aiTextMuted)
-
-                        ForEach(Array(section.paragraphs.enumerated()), id: \.offset) { pIdx, para in
-                            HStack(alignment: .top, spacing: 6) {
-                                CJKTextEditor(text: Binding(
-                                    get: { para },
-                                    set: { newVal in
-                                        guard var p = editingTSPost else { return }
-                                        p.sections[index].paragraphs[pIdx] = newVal
-                                        editingTSPost = p
-                                    }
-                                ), font: .systemFont(ofSize: 13), minHeight: 60)
-                                .padding(4)
-                                .background(Color.aiInputBg)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .strokeBorder(Color.aiBorderLight, lineWidth: 1)
-                                )
-
-                                Button {
-                                    guard var p = editingTSPost else { return }
-                                    p.sections[index].paragraphs.remove(at: pIdx)
-                                    editingTSPost = p
-                                    viewModel.log(category: "写作", action: "删除段落", detail: "章节 \(index + 1), 段落 \(pIdx + 1)")
-                                } label: {
-                                    Image(systemName: "minus.circle")
-                                        .font(.system(size: 13))
-                                        .foregroundColor(.aiError)
-                                }
-                                .buttonStyle(.plain)
-                                .padding(.top, 4)
-                            }
-                        }
-
-                        NookButton(.default, size: .small, label: "+ 添加段落") {
-                            guard var p = editingTSPost else { return }
-                            p.sections[index].paragraphs.append("")
-                            editingTSPost = p
-                            viewModel.log(category: "写作", action: "添加段落", detail: "章节 \(index + 1)")
-                        }
-                    }
-                    .padding(.top, 4)
-                }
-            }
-        }
-    }
-
-    // MARK: - Takeaways Section
-
-    private func tsTakeawaysSection(post: TSPPost) -> some View {
-        NookCard(color: .appYellow) {
-            VStack(alignment: .leading, spacing: 12) {
-                NookSection("🌿 文章要点", subtitle: "文章的核心要点列表") {
-                    if post.takeaways.isEmpty {
-                        Text("暂无要点，点击下方按钮添加。")
-                            .font(.custom("Nunito-Regular", size: 13))
-                            .foregroundColor(.aiTextMuted)
-                            .padding(.vertical, 4)
-                    }
-
-                    ForEach(Array(post.takeaways.enumerated()), id: \.offset) { idx, takeaway in
-                        HStack(spacing: 6) {
-                            Text("•")
-                                .font(.custom("Nunito-Bold", size: 14))
-                                .foregroundColor(.aiTextSecondary)
-                            TextField("要点 \(idx + 1)...", text: Binding(
-                                get: { takeaway },
-                                set: { newVal in
-                                    guard var p = editingTSPost else { return }
-                                    p.takeaways[idx] = newVal
-                                    editingTSPost = p
-                                }
-                            ))
-                            .textFieldStyle(.roundedBorder)
-                            .font(.custom("Nunito-Regular", size: 13))
-
-                            Button {
-                                guard var p = editingTSPost else { return }
-                                p.takeaways.remove(at: idx)
-                                editingTSPost = p
-                                viewModel.log(category: "写作", action: "删除要点", detail: "要点 \(idx + 1)")
-                            } label: {
-                                Image(systemName: "minus.circle")
-                                    .font(.system(size: 13))
-                                    .foregroundColor(.aiError)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-
-                    NookButton(.default, size: .small, label: "+ 添加要点") {
-                        guard var p = editingTSPost else { return }
-                        p.takeaways.append("")
-                        editingTSPost = p
-                        viewModel.log(category: "写作", action: "添加要点", detail: "要点 \(p.takeaways.count)")
-                    }
-                }
-            }
-        }
-    }
-
-    // MARK: - Action Bar
-
-    private func tsActionBar(post: TSPPost) -> some View {
-        NookCard {
-            HStack(spacing: 10) {
-                NookButton(.default, size: .small, label: "保存") {
-                    saveSelectedTSPost()
-                }
-                NookButton(.primary, size: .small, label: "保存并发布") {
-                    if saveSelectedTSPost() {
-                        viewModel.runPublish()
-                    }
-                }
-                Spacer()
-                NookButton(.danger, size: .small, label: "删除") {
-                    showTSDeleteConfirm = true
-                }
-                Text("posts.ts")
-                    .font(.custom("Nunito-Regular", size: 11))
-                    .foregroundColor(.aiTextMuted)
-            }
-        }
-    }
-
-    // MARK: - Status Bar
-
-    private func tsStatusBar(post: TSPPost) -> some View {
-        HStack(spacing: 8) {
-            Text("📝 编辑中: \(post.title.isEmpty ? "未命名" : post.title)")
-                .font(.custom("Nunito-SemiBold", size: 11))
-                .foregroundColor(.aiTextHeader)
-                .lineLimit(1)
-            Text("|")
-                .font(.custom("Nunito-Regular", size: 11))
-                .foregroundColor(.aiTextMuted)
-            Text("💾 \(tsStatusMessage.isEmpty ? "就绪" : tsStatusMessage)")
-                .font(.custom("Nunito-Regular", size: 11))
-                .foregroundColor(.aiTextMuted)
-                .lineLimit(1)
-            Spacer()
-            Text("🚀 点击「保存并发布」推送到博客")
-                .font(.custom("Nunito-Regular", size: 11))
-                .foregroundColor(.aiPrimary)
-                .lineLimit(1)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.aiContent)
-        )
-    }
-
-    // MARK: - Form Field Helper
-
-    private func tsFormField<Content: View>(_ title: String, description: String? = nil, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.custom("Nunito-SemiBold", size: 12))
-                .foregroundColor(.aiTextSecondary)
-            if let description {
-                Text(description)
-                    .font(.custom("Nunito-Regular", size: 11))
-                    .foregroundColor(.aiTextMuted)
-            }
-            content()
-        }
-    }
-
-    // MARK: - TS Bindings
-
-    private func bindingTSTitle() -> Binding<String> {
-        Binding(
-            get: { editingTSPost?.title ?? "" },
-            set: { newVal in editingTSPost?.title = newVal }
-        )
-    }
-
-    private func bindingTSExcerpt() -> Binding<String> {
-        Binding(
-            get: { editingTSPost?.excerpt ?? "" },
-            set: { newVal in editingTSPost?.excerpt = newVal }
-        )
-    }
-
-    private func bindingTSDate() -> Binding<String> {
-        Binding(
-            get: { editingTSPost?.date ?? "" },
-            set: { newVal in editingTSPost?.date = newVal }
-        )
-    }
-
-    private func bindingTSTag() -> Binding<String> {
-        Binding(
-            get: { editingTSPost?.tag ?? "Blog" },
-            set: { newVal in editingTSPost?.tag = newVal }
-        )
-    }
-
-    private func bindingTSColor() -> Binding<String> {
-        Binding(
-            get: { editingTSPost?.color ?? "app-blue" },
-            set: { newVal in editingTSPost?.color = newVal }
-        )
-    }
-
-    private func bindingTSReadTime() -> Binding<String> {
-        Binding(
-            get: { editingTSPost?.readTime ?? "" },
-            set: { newVal in editingTSPost?.readTime = newVal }
-        )
-    }
-
-    private func bindingTSCover() -> Binding<String> {
-        Binding(
-            get: { editingTSPost?.cover ?? "" },
-            set: { newVal in editingTSPost?.cover = newVal }
-        )
-    }
-
-    // MARK: - Sidebar Sync
-
-    private func syncSidebarPost(field: WritableKeyPath<TSPPost, String>, value: String) {
-        guard let id = selectedTSPostID, let idx = tsPosts.firstIndex(where: { $0.id == id }) else { return }
-        tsPosts[idx][keyPath: field] = value
-    }
-
-    // MARK: - TS Actions
-
-    private func loadTSPosts() {
-        do {
-            let path = tsPostService.postsFilePath(in: viewModel.project).path
-            tsPosts = try tsPostService.loadPosts(from: viewModel.project)
-            if let first = tsPosts.first, selectedTSPostID == nil {
-                selectedTSPostID = first.id
-                editingTSPost = first
-                expandedSections = []
-            }
-            tsStatusMessage = "已加载 \(tsPosts.count) 篇文章。\n路径: \(path)"
-            viewModel.log(category: "写作", action: "读取文章", detail: "读取 \(tsPosts.count) 篇文章，路径: \(path)", success: tsPosts.count > 0)
-        } catch {
-            let path = tsPostService.postsFilePath(in: viewModel.project).path
-            tsPosts = []
-            tsStatusMessage = "加载失败：\(path)\n\(error.localizedDescription)"
-            viewModel.log(category: "写作", action: "读取文章", detail: "失败: \(error.localizedDescription)，路径: \(path)", success: false)
-        }
-    }
-
-    @discardableResult
-    private func saveSelectedTSPost() -> Bool {
-        guard let post = editingTSPost else {
-            tsStatusMessage = "没有选中的文章。"
-            return false
-        }
-        let path = tsPostService.postsFilePath(in: viewModel.project).path
-        do {
-            tsPosts = try tsPostService.updatePost(post, in: viewModel.project)
-            if let updated = tsPosts.first(where: { $0.id == post.id }) {
-                editingTSPost = updated
-            }
-            tsStatusMessage = "已保存：\(post.title)"
-            viewModel.log(category: "写作", action: "保存文章", detail: "文章: \(post.title), 路径: \(path)")
-            return true
-        } catch {
-            tsStatusMessage = "保存失败：\(error.localizedDescription)"
-            viewModel.log(category: "写作", action: "保存文章", detail: "失败: \(error.localizedDescription)，文章: \(post.title)", success: false)
-            return false
-        }
-    }
-
-    private func deleteSelectedTSPost() {
-        guard let id = editingTSPost?.id else { return }
-        do {
-            tsPosts = try tsPostService.deletePost(id: id, in: viewModel.project)
-            editingTSPost = nil
-            selectedTSPostID = tsPosts.first?.id
-            expandedSections = []
-            if let first = tsPosts.first {
-                editingTSPost = first
-            }
-            tsStatusMessage = "已删除文章。"
-            viewModel.log(category: "写作", action: "删除文章", detail: "ID: \(id)")
-        } catch {
-            tsStatusMessage = "删除失败：\(error.localizedDescription)"
-            viewModel.log(category: "写作", action: "删除文章", detail: "失败: \(error.localizedDescription)，ID: \(id)", success: false)
-        }
-    }
-
-    // MARK: - Hugo Sidebar
+    // MARK: - Sidebar
 
     private var sidebarContent: some View {
         VStack(spacing: 0) {
             workspaceBar
-
             NookDivider()
 
             if viewModel.posts.isEmpty {
                 NookEmptyState(
-                    icon: .design,
+                    icon: .docText,
                     title: "还没有文章",
                     subtitle: "在右侧创建你的第一篇内容"
                 )
@@ -858,7 +138,7 @@ struct WritingView: View {
         }
     }
 
-    // MARK: - Hugo Detail
+    // MARK: - Detail
 
     private var detailContent: some View {
         GeometryReader { proxy in
@@ -867,7 +147,6 @@ struct WritingView: View {
             ScrollView {
                 VStack(spacing: 12) {
                     newContentCard
-
                     NookWaveDivider()
 
                     if compact {
@@ -879,7 +158,6 @@ struct WritingView: View {
                         HStack(alignment: .top, spacing: 12) {
                             editorArea
                                 .frame(minWidth: 600, maxWidth: .infinity, alignment: .topLeading)
-
                             inspectorPanel
                                 .frame(width: min(max(proxy.size.width * 0.28, 300), 380), alignment: .topLeading)
                         }
@@ -897,7 +175,7 @@ struct WritingView: View {
     private var newContentCard: some View {
         NookCard(color: .appBlue) {
             VStack(alignment: .leading, spacing: 10) {
-                Text("新建内容")
+                Text("新建文章")
                     .font(.custom("Nunito-Bold", size: 16))
                     .foregroundColor(.aiTextHeader)
 
@@ -917,13 +195,8 @@ struct WritingView: View {
 
     private var newContentFields: some View {
         Group {
-            NookInput("内容标题", text: $viewModel.newPostTitle)
+            NookInput("文章标题", text: $viewModel.newPostTitle)
             NookInput("文件名", text: $viewModel.newPostFileName)
-            if isAstroBackend {
-                Text("格式：Astro YAML (Markdown + frontmatter)")
-                    .font(.custom("Nunito-Regular", size: 11))
-                    .foregroundColor(.aiTextMuted)
-            }
         }
     }
 
@@ -938,14 +211,20 @@ struct WritingView: View {
         }
     }
 
-    // MARK: - Hugo Editor Area
+    // MARK: - Editor Area
 
     private var editorArea: some View {
         NookCard {
             VStack(alignment: .leading, spacing: 10) {
-                Text("正文编辑")
-                    .font(.custom("Nunito-Bold", size: 16))
-                    .foregroundColor(.aiTextHeader)
+                HStack {
+                    Text("正文编辑")
+                        .font(.custom("Nunito-Bold", size: 16))
+                        .foregroundColor(.aiTextHeader)
+                    Spacer()
+                    NookButton(.default, size: .small, icon: "wand.and.stars", label: "AI 写作") {
+                        showingAIWritingSheet = true
+                    }
+                }
 
                 MarkdownTextEditor(
                     text: $viewModel.editorPost.body,
@@ -983,12 +262,12 @@ struct WritingView: View {
         }
     }
 
-    // MARK: - Hugo Inspector
+    // MARK: - Inspector
 
     private var inspectorPanel: some View {
         NookCard(color: .appYellow) {
             VStack(alignment: .leading, spacing: 12) {
-                Text(isAstroBackend ? "文章属性 (Astro)" : "文档属性")
+                Text("文章属性")
                     .font(.custom("Nunito-Bold", size: 16))
                     .foregroundColor(.aiTextHeader)
 
@@ -1000,13 +279,13 @@ struct WritingView: View {
                             .textFieldStyle(.roundedBorder)
                     }
 
-                    inspectorField(isAstroBackend ? "发布日期" : "日期") {
+                    inspectorField("发布日期") {
                         DatePicker("", selection: $viewModel.editorPost.date, displayedComponents: [.date, .hourAndMinute])
                             .labelsHidden()
                     }
 
-                    inspectorField(isAstroBackend ? "描述 (description)" : "摘要") {
-                        TextField(isAstroBackend ? "文章描述..." : "摘要（可选）", text: $viewModel.editorPost.summary, axis: .vertical)
+                    inspectorField("描述") {
+                        TextField("文章描述...", text: $viewModel.editorPost.summary, axis: .vertical)
                             .lineLimit(2...4)
                             .textFieldStyle(.roundedBorder)
                     }
@@ -1015,46 +294,40 @@ struct WritingView: View {
                         tagsEditor
                     }
 
-                    inspectorField(isAstroBackend ? "分类 (单选)" : "分类") {
+                    inspectorField("分类") {
                         categoriesEditor
                     }
 
-                    if isAstroBackend {
-                        inspectorField("封面 Emoji") {
-                            TextField("🏝️", text: Binding(
-                                get: { viewModel.editorPost.customTaxonomies["cover"]?.first ?? viewModel.editorPost.cover },
-                                set: { newVal in
-                                    viewModel.editorPost.customTaxonomies["cover"] = [newVal]
-                                    viewModel.editorPost.cover = newVal
-                                }
-                            ))
-                            .textFieldStyle(.roundedBorder)
-                        }
-
-                        inspectorField("卡片颜色") {
-                            Picker("", selection: Binding(
-                                get: { viewModel.editorPost.customTaxonomies["color"]?.first ?? "app-blue" },
-                                set: { viewModel.editorPost.customTaxonomies["color"] = [$0] }
-                            )) {
-                                ForEach(["app-pink","purple","app-blue","app-yellow","app-orange","app-teal","app-green","app-red","lime-green","yellow-green","brown","warm-peach-pink"], id: \.self) { color in
-                                    Text(color).tag(color)
-                                }
+                    inspectorField("封面 Emoji") {
+                        TextField("🏝️", text: Binding(
+                            get: { viewModel.editorPost.customTaxonomies["cover"]?.first ?? viewModel.editorPost.cover },
+                            set: { newVal in
+                                viewModel.editorPost.customTaxonomies["cover"] = [newVal]
+                                viewModel.editorPost.cover = newVal
                             }
-                            .labelsHidden()
-                            .pickerStyle(.menu)
-                        }
+                        ))
+                        .textFieldStyle(.roundedBorder)
+                    }
 
-                        inspectorField("阅读时间") {
-                            TextField("5 分钟", text: Binding(
-                                get: { viewModel.editorPost.customTaxonomies["readTime"]?.first ?? "" },
-                                set: { viewModel.editorPost.customTaxonomies["readTime"] = [$0] }
-                            ))
-                            .textFieldStyle(.roundedBorder)
+                    inspectorField("卡片颜色") {
+                        Picker("", selection: Binding(
+                            get: { viewModel.editorPost.customTaxonomies["color"]?.first ?? "app-blue" },
+                            set: { viewModel.editorPost.customTaxonomies["color"] = [$0] }
+                        )) {
+                            ForEach(["app-pink","purple","app-blue","app-yellow","app-orange","app-teal","app-green","app-red","lime-green","yellow-green","brown","warm-peach-pink"], id: \.self) { color in
+                                Text(color).tag(color)
+                            }
                         }
-                    } else {
-                        inspectorField("Slug") {
-                            NookInput("短链接", text: $viewModel.editorPost.slug)
-                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                    }
+
+                    inspectorField("阅读时间") {
+                        TextField("5 分钟", text: Binding(
+                            get: { viewModel.editorPost.customTaxonomies["readTime"]?.first ?? "" },
+                            set: { viewModel.editorPost.customTaxonomies["readTime"] = [$0] }
+                        ))
+                        .textFieldStyle(.roundedBorder)
                     }
 
                     Toggle("草稿", isOn: $viewModel.editorPost.draft)
@@ -1232,13 +505,8 @@ struct WritingView: View {
                     }
                     if message.role == .assistant {
                         NookButton(.primary, size: .small, label: "追加到正文") {
-                            if isViteBackend {
-                                if var post = editingTSPost, let lastIdx = post.sections.indices.last {
-                                    post.sections[lastIdx].paragraphs.append(message.content)
-                                    editingTSPost = post
-                                    viewModel.log(category: "写作", action: "追加AI内容", detail: "追加到末尾章节")
-                                }
-                            }
+                            viewModel.editorPost.body += "\n\n" + message.content
+                            viewModel.log(category: "写作", action: "追加AI内容", detail: "追加到正文末尾")
                         }
                     }
                 }
@@ -1252,7 +520,7 @@ struct WritingView: View {
         }
     }
 
-    // MARK: - Hugo Helpers
+    // MARK: - Helpers
 
     private var sidebarRoots: [WritingSidebarNode] {
         WritingSidebarNode.buildTree(posts: viewModel.posts, relativePath: relativeDisplayPath(for:))
