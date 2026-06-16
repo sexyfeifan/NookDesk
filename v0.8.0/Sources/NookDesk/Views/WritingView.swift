@@ -55,7 +55,7 @@ struct WritingView: View {
         }
     }
 
-    // MARK: - TS Writing (Vite Backend)
+    // MARK: - TS Writing (Vite/TypeScript Backend)
 
     private var tsWritingBody: some View {
         NavigationSplitView {
@@ -77,7 +77,7 @@ struct WritingView: View {
         }
     }
 
-    // MARK: - Hugo Writing
+    // MARK: - Markdown Writing (Hugo/Astro Backend)
 
     private var hugoWritingBody: some View {
         NavigationSplitView(columnVisibility: editorColumnVisibility) {

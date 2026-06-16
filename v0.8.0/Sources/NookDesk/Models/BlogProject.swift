@@ -40,7 +40,7 @@ struct BlogProject: Codable {
         contentSubpath = try container.decode(String.self, forKey: .contentSubpath)
         gitRemote = try container.decode(String.self, forKey: .gitRemote)
         publishBranch = try container.decode(String.self, forKey: .publishBranch)
-        backendName = try container.decodeIfPresent(String.self, forKey: .backendName) ?? "Vite + React"
+            backendName = try container.decodeIfPresent(String.self, forKey: .backendName) ?? "Astro"
     }
 
     func encode(to encoder: Encoder) throws {
@@ -54,7 +54,7 @@ struct BlogProject: Codable {
     }
 
     var backend: SSGBuildBackend {
-        BackendRegistry.shared.backend(named: backendName) ?? ViteBackend()
+        BackendRegistry.shared.backend(named: backendName) ?? AstroBackend()
     }
 
     static func bootstrap() -> BlogProject {
@@ -106,10 +106,10 @@ struct BlogProject: Codable {
         return BlogProject(
             rootPath: cwd.path,
             buildExecutable: "npm",
-            contentSubpath: "src/pages/Home",
+            contentSubpath: "src/content/blog",
             gitRemote: "origin",
             publishBranch: "main",
-            backendName: "Vite + React"
+            backendName: "Astro"
         )
     }
 

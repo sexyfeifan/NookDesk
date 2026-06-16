@@ -21,6 +21,11 @@ struct WizardView: View {
     @State private var isTestingConnection = false
     @State private var isTestingToken = false
     @State private var wizardError: String?
+    @State private var showCreateNew = false
+    @State private var createPath: String = ""
+    @State private var isCreating = false
+    @State private var createError: String?
+    @State private var createLog: [String] = []
 
     private let stepCount = 5
     private let stepDefaultsKey = "nookdesk.wizard.lastStep"
@@ -196,16 +201,17 @@ struct WizardView: View {
                 .font(.custom("Nunito-Bold", size: 20))
                 .foregroundColor(.aiTextHeader)
 
-            Text("NookDesk 是一个博客管理工作台，帮助你管理 animal-island-blog 项目，创建和编辑文章，并一键发布到 GitHub Pages。")
+            Text("NookDesk 是一个博客管理工作台，帮助你创建和管理 Astro 博客，撰写 Markdown 文章，并一键发布到 GitHub Pages。")
                 .font(.custom("Nunito-Medium", size: 14))
                 .foregroundColor(.aiTextBody)
 
             NookWaveDivider()
 
             VStack(alignment: .leading, spacing: 8) {
-                featureRow("paintbrush.fill", "写作与编辑", "使用 Vditor 编辑器撰写 Markdown 文章")
-                featureRow("icloud.fill", "发布与部署", "自动推送到 GitHub 并部署 Pages")
+                featureRow("square.and.pencil", "Markdown 写作", "使用 Markdown 撰写文章，支持分类、标签、封面")
+                featureRow("paperplane.fill", "一键发布", "自动推送到 GitHub 并部署到 Pages")
                 featureRow("sparkles", "AI 写作助手", "辅助生成和排版文章内容")
+                featureRow("paintbrush.fill", "动森风格主题", "内置 Astro 博客主题，开箱即用")
             }
         }
     }
@@ -235,13 +241,13 @@ struct WizardView: View {
                 .font(.custom("Nunito-Bold", size: 18))
                 .foregroundColor(.aiTextHeader)
 
-            Text("选择你的博客项目根目录，或从 GitHub 克隆一个新项目。")
+            Text("选择你的博客项目目录，或创建一个新博客。")
                 .font(.custom("Nunito-Medium", size: 13))
                 .foregroundColor(.aiTextSecondary)
 
             NookCard(color: .appBlue) {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("选项 A：选择本地目录")
+                    Text("选择已有的 Astro 博客目录")
                         .font(.custom("Nunito-SemiBold", size: 14))
                         .foregroundColor(.aiTextHeader)
 
@@ -251,6 +257,7 @@ struct WizardView: View {
                             if let path = pickDirectory() {
                                 projectPath = path
                                 showCloneOption = false
+                                showCreateNew = false
                                 cloneError = nil
                                 cloneLog = []
                             }
@@ -273,9 +280,82 @@ struct WizardView: View {
 
             NookWaveDivider()
 
-            if !showCloneOption {
-                NookButton(.ghost, size: .small, label: "没有项目？从 GitHub 克隆") {
-                    showCloneOption = true
+            if !showCloneOption && !showCreateNew {
+                HStack(spacing: 12) {
+                    NookButton(.ghost, size: .small, label: "没有项目？创建新博客") {
+                        showCreateNew = true
+                        showCloneOption = false
+                    }
+                    NookButton(.ghost, size: .small, label: "从 GitHub 克隆") {
+                        showCloneOption = true
+                        showCreateNew = false
+                    }
+                }
+            }
+
+            if showCreateNew {
+                NookCard(color: .appYellow) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("创建新博客")
+                            .font(.custom("Nunito-SemiBold", size: 14))
+                            .foregroundColor(.aiTextHeader)
+
+                        Text("将内置 Astro 动森风格主题注入到指定目录，自动初始化 Git 仓库并安装依赖。")
+                            .font(.custom("Nunito-Regular", size: 12))
+                            .foregroundColor(.aiTextSecondary)
+
+                        HStack(spacing: 8) {
+                            NookInput("新博客保存路径", text: $createPath)
+                            NookButton(.default, size: .small, label: "选择") {
+                                if let path = pickDirectory() {
+                                    createPath = path
+                                }
+                            }
+                        }
+
+                        HStack(spacing: 8) {
+                            NookButton(.primary, size: .small, label: "创建博客") {
+                                runCreateNew()
+                            }
+                            .disabled(isCreating || createPath.isEmpty)
+
+                            if isCreating {
+                                ProgressView()
+                                    .controlSize(.small)
+                            }
+                            Spacer()
+                        }
+
+                        if isCreating {
+                            VStack(alignment: .leading, spacing: 4) {
+                                ProgressView()
+                                    .progressViewStyle(.linear)
+                                Text("正在注入主题并初始化...")
+                                    .font(.custom("Nunito-Regular", size: 11))
+                                    .foregroundColor(.aiTextSecondary)
+                            }
+                        }
+
+                        if !createLog.isEmpty {
+                            VStack(alignment: .leading, spacing: 2) {
+                                ForEach(createLog.indices, id: \.self) { index in
+                                    Text(createLog[index])
+                                        .font(.custom("Nunito-Regular", size: 11))
+                                        .foregroundColor(.aiTextMuted)
+                                }
+                            }
+                            .padding(8)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.aiBackground)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+
+                        if let error = createError {
+                            Text(error)
+                                .font(.custom("Nunito-Regular", size: 11))
+                                .foregroundColor(.aiError)
+                        }
+                    }
                 }
             }
 
@@ -583,6 +663,46 @@ struct WizardView: View {
                     cloneLog.append("✅ 项目路径: \(fullPath)")
                     // 自动关闭克隆面板，显示项目路径
                     showCloneOption = false
+                }
+            }
+        }
+    }
+
+    private func runCreateNew() {
+        let trimmedPath = createPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedPath.isEmpty else {
+            createError = "请选择保存路径。"
+            return
+        }
+
+        isCreating = true
+        createError = nil
+        createLog = ["正在创建新博客..."]
+
+        Task {
+            let scaffolding = ProjectScaffoldingService()
+            let targetURL = URL(fileURLWithPath: trimmedPath, isDirectory: true)
+                .appendingPathComponent("my-astro-blog")
+
+            do {
+                try scaffolding.injectBuiltinTheme(into: targetURL) { message in
+                    DispatchQueue.main.async {
+                        self.createLog.append(message)
+                    }
+                }
+
+                await MainActor.run {
+                    isCreating = false
+                    projectPath = targetURL.path
+                    createLog.append("✅ 博客创建完成！")
+                    createLog.append("✅ 路径: \(targetURL.path)")
+                    showCreateNew = false
+                }
+            } catch {
+                await MainActor.run {
+                    isCreating = false
+                    createError = "创建失败：\(error.localizedDescription)"
+                    createLog.append("❌ \(error.localizedDescription)")
                 }
             }
         }

@@ -2110,6 +2110,7 @@ final class AppViewModel: ObservableObject {
         var checks: [PublishCheck] = []
         let fm = FileManager.default
         let root = project.rootURL
+        let backend = project.backend
 
         let packageJsonExists = fm.fileExists(atPath: root.appendingPathComponent("package.json").path)
         checks.append(
@@ -2120,24 +2121,27 @@ final class AppViewModel: ObservableObject {
             )
         )
 
-        let viteConfigExists = project.detectedConfigRelativePath != nil
+        let configExists = project.detectedConfigRelativePath != nil
+        let configName = backend.configFileNames.first ?? "配置文件"
         checks.append(
             PublishCheck(
-                title: "vite.config.ts",
-                detail: viteConfigExists
-                    ? "已找到 \(project.detectedConfigRelativePath ?? "vite.config.ts")。"
-                    : "未找到 vite.config.ts。",
-                level: viteConfigExists ? .ok : .error
+                title: configName,
+                detail: configExists
+                    ? "已找到 \(project.detectedConfigRelativePath ?? configName)。"
+                    : "未找到 \(configName)。",
+                level: configExists ? .ok : .error
             )
         )
 
-        let postsTsPath = project.rootURL.appendingPathComponent("src/pages/Home/posts.ts").path
-        let postsTsExists = fm.fileExists(atPath: postsTsPath)
+        let contentDirPath = root.appendingPathComponent(backend.contentDirectoryName).path
+        let contentDirExists = fm.fileExists(atPath: contentDirPath)
         checks.append(
             PublishCheck(
-                title: "posts.ts 文章数据",
-                detail: postsTsExists ? "已找到 posts.ts。" : "未找到 src/pages/Home/posts.ts。",
-                level: postsTsExists ? .ok : .error
+                title: "内容目录",
+                detail: contentDirExists
+                    ? "已找到 \(backend.contentDirectoryName)。"
+                    : "未找到 \(backend.contentDirectoryName)。",
+                level: contentDirExists ? .ok : .error
             )
         )
 
