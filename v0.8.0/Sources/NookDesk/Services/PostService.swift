@@ -465,25 +465,34 @@ final class PostService {
         formatter.dateFormat = "yyyy-MM-dd"
         formatter.locale = Locale(identifier: "en_US_POSIX")
         var lines: [String] = []
-        lines.append("title: \(encodeYAML(post.title))")
-        lines.append("description: \(encodeYAML(post.summary))")
+        let title = post.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        lines.append("title: \(encodeYAML(title.isEmpty ? "未命名文章" : title))")
+        let desc = post.summary.trimmingCharacters(in: .whitespacesAndNewlines)
+        lines.append("description: \(encodeYAML(desc.isEmpty ? (title.isEmpty ? "待补充描述" : title) : desc))")
         lines.append("pubDate: \(formatter.string(from: post.date))")
-        if let category = post.categories.first, !category.isEmpty {
-            lines.append("category: \(encodeYAML(category))")
-        }
+        let category = post.categories.first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        lines.append("category: \(encodeYAML(category.isEmpty ? "未分类" : category))")
         if !post.tags.isEmpty {
             lines.append("tags: [\(post.tags.map { encodeYAML($0) }.joined(separator: ", "))]")
+        } else {
+            lines.append("tags: []")
         }
         if let cover = post.customTaxonomies["cover"]?.first, !cover.isEmpty {
             lines.append("cover: \(encodeYAML(cover))")
         } else if !post.cover.isEmpty {
             lines.append("cover: \(encodeYAML(post.cover))")
+        } else {
+            lines.append("cover: \"📝\"")
         }
         if let color = post.customTaxonomies["color"]?.first, !color.isEmpty {
-            lines.append("color: \(encodeYAML(color))")
+            lines.append("color: \"\(color)\"")
+        } else {
+            lines.append("color: \"app-blue\"")
         }
         if let readTime = post.customTaxonomies["readTime"]?.first, !readTime.isEmpty {
             lines.append("readTime: \(encodeYAML(readTime))")
+        } else {
+            lines.append("readTime: \"5 分钟\"")
         }
         if post.draft {
             lines.append("draft: true")
