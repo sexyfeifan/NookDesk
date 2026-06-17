@@ -1265,6 +1265,13 @@ final class AppViewModel: ObservableObject {
     private func reloadPosts(selectFirstIfNeeded: Bool, preferredSelectionID: String? = nil) throws {
         let currentSelection = preferredSelectionID ?? selectedPostID
         posts = try postService.loadPosts(for: project)
+
+        if project.backendName.contains("Astro") {
+            for i in posts.indices {
+                posts[i].frontMatterFormat = .astro
+            }
+        }
+
         if let currentSelection,
            let matched = posts.first(where: { $0.id == currentSelection }) {
             selectedPostID = matched.id
