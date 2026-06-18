@@ -75,7 +75,7 @@ final class ContentWorkspaceService {
                 .replacingOccurrences(of: #"`+"#, with: "", options: .regularExpression)
                 .replacingOccurrences(of: #"\[(.*?)\]\((.*?)\)"#, with: "$1", options: .regularExpression)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
-            let slug = slugifyHeading(cleaned)
+            let slug = StringHelpers.slugifyHeading(cleaned)
             if !slug.isEmpty, !anchors.contains(slug) {
                 anchors.append(slug)
             }
@@ -343,7 +343,7 @@ final class ContentWorkspaceService {
         if normalized.hasPrefix("/") {
             normalized.removeFirst()
         }
-        return (normalized, slugifyHeading(anchorPart))
+        return (normalized, StringHelpers.slugifyHeading(anchorPart))
     }
 
     private func linePreview(in body: String, for range: NSRange) -> String {
@@ -353,21 +353,7 @@ final class ContentWorkspaceService {
         return full.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private func slugifyHeading(_ source: String) -> String {
-        let lower = source
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
-        let filtered = lower.map { character -> Character in
-            if character.isLetter || character.isNumber {
-                return character
-            }
-            return "-"
-        }
-        return String(filtered)
-            .replacingOccurrences(of: "-+", with: "-", options: .regularExpression)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
-    }
+    // slugifyHeading is now provided by StringHelpers.
 
     private func normalizedCode(from value: String) -> String {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)

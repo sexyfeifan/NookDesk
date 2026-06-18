@@ -40,11 +40,13 @@ struct ConfigBackupBundle: Codable {
         project = try container.decode(BlogProject.self, forKey: .project)
         themeConfig = try container.decode(ThemeConfig.self, forKey: .themeConfig)
         remoteProfile = try container.decode(RemoteProfile.self, forKey: .remoteProfile)
-        let legacy = try decoder.container(keyedBy: LegacyCodingKeys.self)
-        let legacyToken = try legacy.decodeIfPresent(String.self, forKey: .githubToken) ?? ""
+        // [NookDesk 修复] 旧版用 LegacyCodingKeys 从 decoder 新建 container 解码，
+        // 但实际上应该从同一个 container（CodingKeys）解码 githubToken，
+        // 避免解码失败或取到错误值。
         githubTokenClassic = try container.decodeIfPresent(String.self, forKey: .githubTokenClassic) ?? ""
         githubTokenFineGrained = try container.decodeIfPresent(String.self, forKey: .githubTokenFineGrained) ?? ""
         if githubTokenClassic.isEmpty && githubTokenFineGrained.isEmpty {
+            let legacyToken = try container.decodeIfPresent(String.self, forKey: .githubToken) ?? ""
             githubTokenFineGrained = legacyToken
         }
         aiProfile = try container.decodeIfPresent(AIProfile.self, forKey: .aiProfile) ?? .default
@@ -61,6 +63,9 @@ struct ConfigBackupBundle: Codable {
         case githubTokenFineGrained
         case aiProfile
         case aiAPIKey
+        // [NookDesk 修复] 把旧版字段 githubToken 也加入 CodingKeys，
+        // 这样可以从同一个 container 解码，而非新建另一个 container 导致 bug。
+        case githubToken
     }
 
     private enum LegacyCodingKeys: String, CodingKey {

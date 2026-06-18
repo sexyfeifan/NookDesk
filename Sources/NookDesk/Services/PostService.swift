@@ -46,7 +46,7 @@ final class PostService {
     }
 
     func suggestFileName(from title: String) -> String {
-        "\(slugify(title.isEmpty ? "new-post" : title)).md"
+        "\(StringHelpers.slugify(title.isEmpty ? "new-post" : title)).md"
     }
 
     func suggestTitle(fromFileName fileName: String) -> String {
@@ -141,7 +141,7 @@ final class PostService {
             candidate = targetDir.appendingPathComponent("\(desiredStem)-\(attempt).md")
         }
 
-        var post = BlogPost.empty(in: targetDir)
+        var post = BlogPost.empty(in: targetDir, backend: project.backend)
         post.fileURL = candidate
         post.title = title
         post.date = Date()
@@ -353,21 +353,47 @@ final class PostService {
         post.translationKey = ""
     }
 
+    // [NookDesk 修复] 支持 TOML 嵌套表语法 [key.sub]，
+    // 将子表中的键存储为 "sub.key" 形式的扁平 key，
+    // 使得 front matter 解析能正确处理 Hugo 的多级表结构。
     private func parseTOMLFrontMatter(_ raw: String) -> [String: Any] {
         var entries: [String: Any] = [:]
         var currentSection = ""
+        var currentSubSection = ""
         for line in raw.components(separatedBy: .newlines) {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             if trimmed.isEmpty || trimmed.hasPrefix("#") { continue }
+            // 匹配 [[array.of.tables]]（TOML 数组表，跳过内部处理）
+            if trimmed.hasPrefix("[[") && trimmed.hasSuffix("]]") {
+                currentSection = ""
+                currentSubSection = ""
+                continue
+            }
+            // 匹配 [section] 或 [section.subsection]
             if trimmed.hasPrefix("[") && trimmed.hasSuffix("]") {
-                currentSection = String(trimmed.dropFirst().dropLast())
+                let sectionName = String(trimmed.dropFirst().dropLast())
+                if let dotIndex = sectionName.firstIndex(of: ".") {
+                    // [key.sub] 形式：记录父节和子节
+                    currentSection = String(sectionName[..<dotIndex])
+                    currentSubSection = String(sectionName[sectionName.index(after: dotIndex)...])
+                } else {
+                    currentSection = sectionName
+                    currentSubSection = ""
+                }
                 continue
             }
             guard let idx = trimmed.firstIndex(of: "=") else { continue }
             let key = String(trimmed[..<idx]).trimmingCharacters(in: .whitespaces)
             let value = String(trimmed[trimmed.index(after: idx)...]).trimmingCharacters(in: .whitespaces)
             let parsed = parseScalarOrArray(value)
-            entries[key] = parsed
+            // 如果在子节 [section.sub] 下，用 "sub.key" 作为存储键
+            if !currentSection.isEmpty && !currentSubSection.isEmpty {
+                entries["\(currentSubSection).\(key)"] = parsed
+            } else if !currentSection.isEmpty {
+                entries["\(currentSection).\(key)"] = parsed
+            } else {
+                entries[key] = parsed
+            }
         }
         return entries
     }
@@ -380,7 +406,7 @@ final class PostService {
             if trimmed.isEmpty || trimmed.hasPrefix("#") { continue }
             if let key = activeArrayKey, trimmed.hasPrefix("- ") {
                 var current = entries[key] as? [String] ?? []
-                current.append(parseString(String(trimmed.dropFirst(2)).trimmingCharacters(in: .whitespaces)))
+                current.append(StringHelpers.parseString(String(trimmed.dropFirst(2)).trimmingCharacters(in: .whitespaces)))
                 entries[key] = current
                 continue
             }
@@ -409,20 +435,20 @@ final class PostService {
     private func parseScalarOrArray(_ raw: String) -> Any {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.hasPrefix("[") && trimmed.hasSuffix("]") {
-            return parseArray(trimmed)
+            return StringHelpers.parseArray(trimmed)
         }
         if trimmed.lowercased() == "true" || trimmed.lowercased() == "false" {
-            return parseBool(trimmed)
+            return StringHelpers.parseBool(trimmed)
         }
-        return parseString(trimmed)
+        return StringHelpers.parseString(trimmed)
     }
 
     private func renderTOMLFrontMatter(for post: BlogPost) -> String {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
         var lines: [String] = []
-        lines.append("title = \(encode(post.title))")
-        lines.append("date = \(encode(formatter.string(from: post.date)))")
+        lines.append("title = \(StringHelpers.encodeString(post.title))")
+        lines.append("date = \(StringHelpers.encodeString(formatter.string(from: post.date)))")
         lines.append("draft = \(post.draft ? "true" : "false")")
         appendOptionalString(post.summary, key: "summary", to: &lines)
         appendOptionalArray(post.tags, key: "tags", to: &lines)
@@ -449,8 +475,8 @@ final class PostService {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
         var lines: [String] = []
-        lines.append("title: \(encodeYAML(post.title))")
-        lines.append("date: \(encodeYAML(formatter.string(from: post.date)))")
+        lines.append("title: \(StringHelpers.encodeYAML(post.title))")
+        lines.append("date: \(StringHelpers.encodeYAML(formatter.string(from: post.date)))")
         lines.append("draft: \(post.draft ? "true" : "false")")
         appendOptionalYAMLString(post.summary, key: "summary", to: &lines)
         appendOptionalYAMLArray(post.tags, key: "tags", to: &lines)
@@ -466,21 +492,21 @@ final class PostService {
         formatter.locale = Locale(identifier: "en_US_POSIX")
         var lines: [String] = []
         let title = post.title.trimmingCharacters(in: .whitespacesAndNewlines)
-        lines.append("title: \(encodeYAML(title.isEmpty ? "未命名文章" : title))")
+        lines.append("title: \(StringHelpers.encodeYAML(title.isEmpty ? "未命名文章" : title))")
         let desc = post.summary.trimmingCharacters(in: .whitespacesAndNewlines)
-        lines.append("description: \(encodeYAML(desc.isEmpty ? (title.isEmpty ? "待补充描述" : title) : desc))")
+        lines.append("description: \(StringHelpers.encodeYAML(desc.isEmpty ? (title.isEmpty ? "待补充描述" : title) : desc))")
         lines.append("pubDate: \(formatter.string(from: post.date))")
         let category = post.categories.first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        lines.append("category: \(encodeYAML(category.isEmpty ? "未分类" : category))")
+        lines.append("category: \(StringHelpers.encodeYAML(category.isEmpty ? "未分类" : category))")
         if !post.tags.isEmpty {
-            lines.append("tags: [\(post.tags.map { encodeYAML($0) }.joined(separator: ", "))]")
+            lines.append("tags: [\(post.tags.map { StringHelpers.encodeYAML($0) }.joined(separator: ", "))]")
         } else {
             lines.append("tags: []")
         }
         if let cover = post.customTaxonomies["cover"]?.first, !cover.isEmpty {
-            lines.append("cover: \(encodeYAML(cover))")
+            lines.append("cover: \(StringHelpers.encodeYAML(cover))")
         } else if !post.cover.isEmpty {
-            lines.append("cover: \(encodeYAML(post.cover))")
+            lines.append("cover: \(StringHelpers.encodeYAML(post.cover))")
         } else {
             lines.append("cover: \"📝\"")
         }
@@ -490,7 +516,7 @@ final class PostService {
             lines.append("color: \"app-blue\"")
         }
         if let readTime = post.customTaxonomies["readTime"]?.first, !readTime.isEmpty {
-            lines.append("readTime: \(encodeYAML(readTime))")
+            lines.append("readTime: \(StringHelpers.encodeYAML(readTime))")
         } else {
             lines.append("readTime: \"5 分钟\"")
         }
@@ -526,12 +552,12 @@ final class PostService {
 
     private func appendOptionalString(_ value: String, key: String, to lines: inout [String]) {
         guard !value.isEmpty else { return }
-        lines.append("\(key) = \(encode(value))")
+        lines.append("\(key) = \(StringHelpers.encodeString(value))")
     }
 
     private func appendOptionalArray(_ value: [String], key: String, to lines: inout [String]) {
         guard !value.isEmpty else { return }
-        lines.append("\(key) = \(encodeArray(value))")
+        lines.append("\(key) = \(StringHelpers.encodeArray(value))")
     }
 
     private func appendOptionalBool(_ value: Bool, key: String, to lines: inout [String]) {
@@ -541,14 +567,14 @@ final class PostService {
 
     private func appendOptionalYAMLString(_ value: String, key: String, to lines: inout [String]) {
         guard !value.isEmpty else { return }
-        lines.append("\(key): \(encodeYAML(value))")
+        lines.append("\(key): \(StringHelpers.encodeYAML(value))")
     }
 
     private func appendOptionalYAMLArray(_ value: [String], key: String, to lines: inout [String]) {
         guard !value.isEmpty else { return }
         lines.append("\(key):")
         for item in value {
-            lines.append("  - \(encodeYAML(item))")
+            lines.append("  - \(StringHelpers.encodeYAML(item))")
         }
     }
 
@@ -559,7 +585,7 @@ final class PostService {
     }
 
     private func parseDate(_ raw: String) -> Date? {
-        let text = parseString(raw)
+        let text = StringHelpers.parseString(raw)
         let iso = ISO8601DateFormatter()
         iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         if let value = iso.date(from: text) {
@@ -577,7 +603,7 @@ final class PostService {
 
     private func boolValue(_ value: Any?) -> Bool? {
         if let bool = value as? Bool { return bool }
-        if let string = value as? String { return parseBool(string) }
+        if let string = value as? String { return StringHelpers.parseBool(string) }
         return nil
     }
 
@@ -585,113 +611,19 @@ final class PostService {
         if let array = value as? [String] { return array }
         if let array = value as? [Any] { return array.compactMap { $0 as? String } }
         if let string = value as? String {
-            let parsed = parseArray(string)
+            let parsed = StringHelpers.parseArray(string)
             return parsed.isEmpty ? nil : parsed
         }
         return nil
     }
 
-    private func parseString(_ raw: String) -> String {
-        var value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        if value.hasPrefix("\"") && value.hasSuffix("\"") && value.count >= 2 {
-            value.removeFirst()
-            value.removeLast()
-            value = decodeEscapes(value)
-        } else if value.hasPrefix("'") && value.hasSuffix("'") && value.count >= 2 {
-            value.removeFirst()
-            value.removeLast()
-        }
-        return value
-    }
-
-    private func decodeEscapes(_ text: String) -> String {
-        var result = ""
-        var escaping = false
-        for ch in text {
-            if escaping {
-                switch ch {
-                case "n": result.append("\n")
-                case "r": result.append("\r")
-                case "t": result.append("\t")
-                case "\"": result.append("\"")
-                case "\\": result.append("\\")
-                default: result.append(ch)
-                }
-                escaping = false
-                continue
-            }
-            if ch == "\\" { escaping = true }
-            else { result.append(ch) }
-        }
-        if escaping { result.append("\\") }
-        return result
-    }
-
-    private func parseBool(_ raw: String) -> Bool {
-        parseString(raw).lowercased() == "true"
-    }
-
-    private func parseArray(_ raw: String) -> [String] {
-        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.hasPrefix("[") && trimmed.hasSuffix("]") else {
-            let single = parseString(trimmed)
-            return single.isEmpty ? [] : [single]
-        }
-        let content = String(trimmed.dropFirst().dropLast())
-        if content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return [] }
-        return content.split(separator: ",")
-            .map { parseString(String($0)) }
-            .filter { !$0.isEmpty }
-    }
-
-    private func encode(_ text: String) -> String {
-        let escaped = text
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
-            .replacingOccurrences(of: "\r", with: "\\r")
-            .replacingOccurrences(of: "\n", with: "\\n")
-            .replacingOccurrences(of: "\t", with: "\\t")
-        return "\"\(escaped)\""
-    }
-
-    private func encodeArray(_ values: [String]) -> String {
-        "[" + values.map { encode($0) }.joined(separator: ", ") + "]"
-    }
-
-    private func encodeYAML(_ text: String) -> String {
-        let escaped = text
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
-            .replacingOccurrences(of: "\r", with: "\\r")
-            .replacingOccurrences(of: "\n", with: "\\n")
-            .replacingOccurrences(of: "\t", with: "\\t")
-        return "\"\(escaped)\""
-    }
+    // parseString, parseBool, parseArray, encodeString, encodeArray, encodeYAML
+    // are now provided by StringHelpers.
 
     private func sanitizeFileStem(_ raw: String, fallbackTitle: String) -> String {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         let noExt = trimmed.hasSuffix(".md") ? String(trimmed.dropLast(3)) : trimmed
-        let base = noExt.isEmpty ? slugify(fallbackTitle.isEmpty ? "new-post" : fallbackTitle) : slugify(noExt)
+        let base = noExt.isEmpty ? StringHelpers.slugify(fallbackTitle.isEmpty ? "new-post" : fallbackTitle) : StringHelpers.slugify(noExt)
         return base.isEmpty ? "post-\(Int(Date().timeIntervalSince1970))" : base
-    }
-
-    private func slugify(_ source: String) -> String {
-        let pinyin = toPinyin(source)
-        let lower = pinyin.lowercased()
-        let filtered = lower.map { char -> Character in
-            if char.isLetter || char.isNumber { return char }
-            return "-"
-        }
-        let compact = String(filtered)
-            .replacingOccurrences(of: "-+", with: "-", options: .regularExpression)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
-        return compact.isEmpty ? "post-\(Int(Date().timeIntervalSince1970))" : compact
-    }
-
-    private func toPinyin(_ source: String) -> String {
-        let mutable = NSMutableString(string: source) as CFMutableString
-        CFStringTransform(mutable, nil, kCFStringTransformToLatin, false)
-        CFStringTransform(mutable, nil, kCFStringTransformStripCombiningMarks, false)
-        return mutable as String
     }
 }

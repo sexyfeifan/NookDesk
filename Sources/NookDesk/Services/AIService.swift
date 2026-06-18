@@ -268,6 +268,10 @@ struct AIService {
     }
 
     private func fetchReferenceContext(from url: URL) async -> String? {
+        guard StringHelpers.isAllowedExternalURL(url) else {
+            return nil
+        }
+
         var request = URLRequest(url: url)
         request.timeoutInterval = 15
         request.setValue("Mozilla/5.0 NookDesk/1.0", forHTTPHeaderField: "User-Agent")

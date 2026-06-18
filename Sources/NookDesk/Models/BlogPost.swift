@@ -42,8 +42,24 @@ struct BlogPost: Identifiable {
 
     var bundleDisplayName: String { "单文件" }
 
-    static func empty(in contentURL: URL) -> BlogPost {
+    // [NookDesk 修复] 增加 backend 参数，默认 .yaml 格式；
+    // 当后端是 Astro 时用 .astro 格式，Hugo 用 .toml。
+    static func empty(in contentURL: URL, backend: SSGBuildBackend? = nil) -> BlogPost {
         let file = contentURL.appendingPathComponent("new-post.md")
+        // [NookDesk 修复] 根据后端类型选择默认 front matter 格式
+        let defaultFormat: FrontMatterFormat
+        if let backend {
+            switch backend.displayName {
+            case "Astro":
+                defaultFormat = .astro
+            case "Hugo":
+                defaultFormat = .toml
+            default:
+                defaultFormat = .yaml
+            }
+        } else {
+            defaultFormat = .yaml
+        }
         return BlogPost(
             fileURL: file,
             title: "",
@@ -66,7 +82,7 @@ struct BlogPost: Identifiable {
             urlPath: "",
             aliases: [],
             translationKey: "",
-            frontMatterFormat: .toml,
+            frontMatterFormat: defaultFormat,
             rawFrontMatter: "",
             body: ""
         )

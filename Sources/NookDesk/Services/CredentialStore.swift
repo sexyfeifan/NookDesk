@@ -2,6 +2,17 @@ import CryptoKit
 import Foundation
 import Security
 
+enum CredentialStoreError: LocalizedError {
+    case keychainSaveFailed(status: OSStatus)
+
+    var errorDescription: String? {
+        switch self {
+        case let .keychainSaveFailed(status):
+            return "Keychain 保存失败（OSStatus: \(status)）。"
+        }
+    }
+}
+
 final class CredentialStore {
     private let fm = FileManager.default
     private let githubTokenLegacyService = "com.nookdesk.github.token"
@@ -31,16 +42,16 @@ final class CredentialStore {
         return loadSecret(service: githubTokenLegacyService, for: projectRoot)
     }
 
-    func saveTokenClassic(_ token: String, for projectRoot: String) {
-        saveSecret(token, service: githubTokenClassicService, for: projectRoot)
+    func saveTokenClassic(_ token: String, for projectRoot: String) throws {
+        try saveSecret(token, service: githubTokenClassicService, for: projectRoot)
     }
 
     func loadTokenFineGrained(for projectRoot: String) -> String {
         loadSecret(service: githubTokenFineGrainedService, for: projectRoot)
     }
 
-    func saveTokenFineGrained(_ token: String, for projectRoot: String) {
-        saveSecret(token, service: githubTokenFineGrainedService, for: projectRoot)
+    func saveTokenFineGrained(_ token: String, for projectRoot: String) throws {
+        try saveSecret(token, service: githubTokenFineGrainedService, for: projectRoot)
     }
 
     func loadAIProfile(for projectRoot: String) -> AIProfile {
@@ -62,11 +73,11 @@ final class CredentialStore {
         loadSecret(service: aiAPIKeyService, for: projectRoot)
     }
 
-    func saveAIAPIKey(_ apiKey: String, for projectRoot: String) {
-        saveSecret(apiKey, service: aiAPIKeyService, for: projectRoot)
+    func saveAIAPIKey(_ apiKey: String, for projectRoot: String) throws {
+        try saveSecret(apiKey, service: aiAPIKeyService, for: projectRoot)
     }
 
-    private func saveSecret(_ secret: String, service: String, for projectRoot: String) {
+    private func saveSecret(_ secret: String, service: String, for projectRoot: String) throws {
         let account = accountKey(for: projectRoot)
         let encoded = secret.data(using: .utf8) ?? Data()
 
@@ -86,7 +97,7 @@ final class CredentialStore {
             create[kSecValueData as String] = encoded
             let status = SecItemAdd(create as CFDictionary, nil)
             if status != errSecSuccess && status != errSecDuplicateItem {
-                print("[NookDesk] SecItemAdd failed with status: \(status)")
+                throw CredentialStoreError.keychainSaveFailed(status: status)
             }
         }
     }

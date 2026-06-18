@@ -126,37 +126,11 @@ struct GitHubActionsService: Sendable {
     }
 
     private func parseRepo(from remoteURL: String) throws -> (owner: String, name: String) {
-        let trimmed = remoteURL.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if trimmed.hasPrefix("git@github.com:") {
-            let rest = trimmed.replacingOccurrences(of: "git@github.com:", with: "")
-            let parts = rest.split(separator: "/")
-            guard parts.count == 2 else {
-                throw GitHubActionsError.invalidRepositoryURL
-            }
-            let owner = String(parts[0])
-            let repo = stripGitSuffix(String(parts[1]))
-            return (owner, repo)
-        }
-
-        guard let url = URL(string: trimmed),
-              url.host?.contains("github.com") == true else {
+        do {
+            return try StringHelpers.parseGitHubRepo(from: remoteURL)
+        } catch {
             throw GitHubActionsError.invalidRepositoryURL
         }
-        let comps = url.pathComponents.filter { $0 != "/" }
-        guard comps.count >= 2 else {
-            throw GitHubActionsError.invalidRepositoryURL
-        }
-        let owner = comps[0]
-        let repo = stripGitSuffix(comps[1])
-        return (owner, repo)
-    }
-
-    private func stripGitSuffix(_ name: String) -> String {
-        guard name.hasSuffix(".git") else {
-            return name
-        }
-        return String(name.dropLast(4))
     }
 }
 

@@ -4,6 +4,10 @@ import WebKit
 struct MarkdownPreviewView: NSViewRepresentable {
     let markdown: String
 
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         let webView = WKWebView(frame: .zero, configuration: config)
@@ -12,8 +16,37 @@ struct MarkdownPreviewView: NSViewRepresentable {
     }
 
     func updateNSView(_ webView: WKWebView, context: Context) {
-        let html = Self.renderHTML(from: markdown)
-        webView.loadHTMLString(html, baseURL: nil)
+        let coordinator = context.coordinator
+        coordinator.pendingMarkdown = markdown
+
+        // Cancel any in-flight debounce timer
+        coordinator.debounceTimer?.invalidate()
+
+        // If first load (no previous content), render immediately
+        if coordinator.lastRenderedMarkdown == nil {
+            coordinator.lastRenderedMarkdown = markdown
+            let html = Self.renderHTML(from: markdown)
+            webView.loadHTMLString(html, baseURL: nil)
+            return
+        }
+
+        // Debounce: wait 300ms of idle time before rendering
+        coordinator.debounceTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { [weak webView] _ in
+            guard let webView = webView else { return }
+            let pending = coordinator.pendingMarkdown
+            guard pending != coordinator.lastRenderedMarkdown else { return }
+            coordinator.lastRenderedMarkdown = pending
+            let html = Self.renderHTML(from: pending)
+            DispatchQueue.main.async {
+                webView.loadHTMLString(html, baseURL: nil)
+            }
+        }
+    }
+
+    final class Coordinator {
+        var debounceTimer: Timer?
+        var lastRenderedMarkdown: String?
+        var pendingMarkdown: String = ""
     }
 
     static func renderHTML(from markdown: String) -> String {

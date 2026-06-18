@@ -37,17 +37,40 @@ enum ProcessRunnerError: LocalizedError {
 }
 
 final class ProcessRunner {
+    /// Extra PATH segments prepended before the existing environment PATH.
+    /// Default includes common Unix locations; callers can override via `init(extraPATH:)`.
+    var extraPATHComponents: [String]
+
+    init(extraPATHComponents: [String]? = nil) {
+        #if os(macOS)
+        let defaultComponents = ["/opt/homebrew/bin", "/opt/homebrew/sbin", "/usr/local/bin"]
+        #else
+        let defaultComponents: [String] = []
+        #endif
+        self.extraPATHComponents = extraPATHComponents ?? defaultComponents
+    }
+
     func enrichedEnvironment(cwd: URL? = nil, _ extra: [String: String] = [:]) -> [String: String] {
         var env = ProcessInfo.processInfo.environment
-        var extraPaths = "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+        var extraPaths = extraPATHComponents
         if let cwd = cwd {
             let nodeModulesBin = cwd.appendingPathComponent("node_modules/.bin").path
-            extraPaths = "\(nodeModulesBin):\(extraPaths)"
+            extraPaths.insert(nodeModulesBin, at: 0)
         }
-        if let existing = env["PATH"] {
-            env["PATH"] = "\(extraPaths):\(existing)"
+        let systemPaths = "/usr/bin:/bin:/usr/sbin:/sbin"
+        if !extraPaths.isEmpty {
+            let combined = extraPaths.joined(separator: ":") + ":" + systemPaths
+            if let existing = env["PATH"] {
+                env["PATH"] = "\(combined):\(existing)"
+            } else {
+                env["PATH"] = combined
+            }
         } else {
-            env["PATH"] = extraPaths
+            if let existing = env["PATH"] {
+                env["PATH"] = "\(systemPaths):\(existing)"
+            } else {
+                env["PATH"] = systemPaths
+            }
         }
         for (k, v) in extra { env[k] = v }
         return env

@@ -9,8 +9,8 @@ final class ImageAssetService {
 
         let ext = sourceURL.pathExtension.isEmpty ? "png" : sourceURL.pathExtension.lowercased()
         let base = sourceURL.deletingPathExtension().lastPathComponent
-        let slug = slugify(base)
-        let stamp = timestamp()
+        let slug = StringHelpers.slugify(base)
+        let stamp = StringHelpers.timestamp()
         let fileName = "\(stamp)-\(slug).\(ext)"
         let targetURL = uniqueFileURL(in: targetDir, preferredName: fileName)
 
@@ -103,25 +103,7 @@ final class ImageAssetService {
         return candidate
     }
 
-    private func slugify(_ source: String) -> String {
-        let lower = source.lowercased()
-        let out = lower.map { ch -> Character in
-            if ch.isLetter || ch.isNumber {
-                return ch
-            }
-            return "-"
-        }
-        let compact = String(out)
-            .replacingOccurrences(of: "-+", with: "-", options: .regularExpression)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
-        return compact.isEmpty ? "image" : compact
-    }
-
-    private func timestamp() -> String {
-        let f = DateFormatter()
-        f.dateFormat = "yyyyMMdd-HHmmss"
-        return f.string(from: Date())
-    }
+    // slugify and timestamp are now provided by StringHelpers.
 
     private func mediaKind(for url: URL) -> String {
         switch url.pathExtension.lowercased() {

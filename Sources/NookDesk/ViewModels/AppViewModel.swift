@@ -99,7 +99,7 @@ final class AppViewModel: ObservableObject {
     init() {
         let project = BlogProject.bootstrap()
         self.project = project
-        self.editorPost = BlogPost.empty(in: project.contentURL)
+        self.editorPost = BlogPost.empty(in: project.contentURL, backend: project.backend)
         self.newPostTitle = ""
         self.newPostFileName = "new-post.md"
         loadAll()
@@ -193,7 +193,7 @@ final class AppViewModel: ObservableObject {
         let desiredStem = newPostFileName.isEmpty ? "new-post" : newPostFileName
         let targetDir = project.contentURL(forSectionPath: newPostSectionPath)
         let target = targetDir.appendingPathComponent(desiredStem.hasSuffix(".md") ? desiredStem : "\(desiredStem).md")
-        var post = BlogPost.empty(in: targetDir)
+        var post = BlogPost.empty(in: targetDir, backend: project.backend)
         post.fileURL = target
         post.title = title
         post.date = Date()
@@ -280,8 +280,8 @@ final class AppViewModel: ObservableObject {
                 workflowName: defaultWorkflowName
             )
             try credentialStore.saveRemoteProfile(profile, for: project.rootPath)
-            credentialStore.saveTokenFineGrained(githubFineGrainedToken, for: project.rootPath)
-            credentialStore.saveTokenClassic(githubClassicToken, for: project.rootPath)
+            try credentialStore.saveTokenFineGrained(githubFineGrainedToken, for: project.rootPath)
+            try credentialStore.saveTokenClassic(githubClassicToken, for: project.rootPath)
             try saveLocalConfigBundle()
             statusText = "远程与令牌设置已保存，并同步到项目配置包。"
             Task { await self.runAllPreflightChecksSilently() }
@@ -298,7 +298,7 @@ final class AppViewModel: ObservableObject {
                 model: aiModel.trimmingCharacters(in: .whitespacesAndNewlines)
             )
             try credentialStore.saveAIProfile(profile, for: project.rootPath)
-            credentialStore.saveAIAPIKey(aiAPIKey, for: project.rootPath)
+            try credentialStore.saveAIAPIKey(aiAPIKey, for: project.rootPath)
             try saveLocalConfigBundle()
             statusText = "AI 设置已保存，并同步到项目配置包。"
         } catch {
@@ -1227,10 +1227,10 @@ final class AppViewModel: ObservableObject {
 
         try configService.saveConfig(config, for: project)
         try credentialStore.saveRemoteProfile(bundle.remoteProfile, for: project.rootPath)
-        credentialStore.saveTokenClassic(bundle.githubTokenClassic, for: project.rootPath)
-        credentialStore.saveTokenFineGrained(bundle.githubTokenFineGrained, for: project.rootPath)
+        try credentialStore.saveTokenClassic(bundle.githubTokenClassic, for: project.rootPath)
+        try credentialStore.saveTokenFineGrained(bundle.githubTokenFineGrained, for: project.rootPath)
         try credentialStore.saveAIProfile(bundle.aiProfile, for: project.rootPath)
-        credentialStore.saveAIAPIKey(bundle.aiAPIKey, for: project.rootPath)
+        try credentialStore.saveAIAPIKey(bundle.aiAPIKey, for: project.rootPath)
         if persistToProjectBundle {
             try saveLocalConfigBundle()
         }
@@ -1307,7 +1307,7 @@ final class AppViewModel: ObservableObject {
             editorPost = first
         } else if posts.isEmpty {
             selectedPostID = nil
-            editorPost = BlogPost.empty(in: project.contentURL)
+            editorPost = BlogPost.empty(in: project.contentURL, backend: project.backend)
         }
         menuTreeEntries = contentWorkspaceService.menuTreeEntries(posts: posts)
     }

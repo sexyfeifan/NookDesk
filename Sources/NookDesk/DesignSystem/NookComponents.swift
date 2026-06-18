@@ -22,7 +22,7 @@ struct NookCard<Content: View>: View {
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .strokeBorder(color.color.opacity(0.5), lineWidth: color == .nookDefault ? 0 : 2)
             )
-            .offset(y: isHovered ? -2 : 0)
+            .offset(y: isHovered ? -1 : 0)
             .animation(NookAnimations.nookCardHover, value: isHovered)
             .onHover { hovering in isHovered = hovering }
     }
@@ -400,81 +400,6 @@ struct NookSidebarItem: View {
     }
 }
 
-// MARK: - NookFooter
-
-enum NookFooterStyle {
-    case sea
-    case forest
-}
-
-struct NookFooter: View {
-    let style: NookFooterStyle
-
-    init(style: NookFooterStyle = .sea) {
-        self.style = style
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            waveShape
-                .frame(height: 40)
-                .opacity(0.6)
-
-            HStack {
-                Spacer()
-                Text("NookDesk")
-                    .font(.custom("Nunito-Bold", size: 11))
-                    .foregroundColor(.aiTextMuted)
-                Spacer()
-            }
-            .padding(.vertical, 8)
-            .background(footerBackgroundColor)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    private var waveShape: some View {
-        Canvas { context, size in
-            var path = Path()
-            path.move(to: CGPoint(x: 0, y: size.height * 0.6))
-
-            let waveCount = 3
-            let waveWidth = size.width / CGFloat(waveCount)
-            for i in 0..<waveCount {
-                let startX = CGFloat(i) * waveWidth
-                path.addCurve(
-                    to: CGPoint(x: startX + waveWidth, y: size.height * 0.6),
-                    control1: CGPoint(x: startX + waveWidth * 0.33, y: size.height * 0.2),
-                    control2: CGPoint(x: startX + waveWidth * 0.66, y: size.height)
-                )
-            }
-
-            path.addLine(to: CGPoint(x: size.width, y: size.height))
-            path.addLine(to: CGPoint(x: 0, y: size.height))
-            path.closeSubpath()
-
-            context.fill(path, with: .color(waveColor))
-        }
-    }
-
-    private var waveColor: Color {
-        switch style {
-        case .sea:
-            return .aiSea
-        case .forest:
-            return .aiForest
-        }
-    }
-
-    private var footerBackgroundColor: Color {
-        switch style {
-        case .sea:
-            return Color.aiSea.opacity(0.15)
-        case .forest:
-            return Color.aiForest.opacity(0.15)
-        }
-    }
-}
 
 // MARK: - NookWaveDivider
 
@@ -657,7 +582,6 @@ struct NookDropdown<Label: View, Content: View>: View {
     let label: () -> Label
     let content: () -> Content
 
-    @State private var isOpen = false
     @State private var isHovered = false
 
     init(

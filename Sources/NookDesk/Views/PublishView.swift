@@ -4,6 +4,7 @@ import SwiftUI
 struct PublishView: View {
     @ObservedObject var viewModel: AppViewModel
     @State private var expandedLogIDs: Set<UUID> = []
+    @State private var cachedPreflightChecks: [PreflightCheck] = []
 
     var body: some View {
         ScrollView {
@@ -16,13 +17,17 @@ struct PublishView: View {
             }
             .padding(24)
         }
+        .onAppear { cachedPreflightChecks = computePreflightChecks() }
+        .onChange(of: viewModel.publishRemoteURL) { _ in cachedPreflightChecks = computePreflightChecks() }
+        .onChange(of: viewModel.githubTokenUsageSummary) { _ in cachedPreflightChecks = computePreflightChecks() }
+        .onChange(of: viewModel.posts.count) { _ in cachedPreflightChecks = computePreflightChecks() }
+        .onChange(of: viewModel.posts.map(\.draft)) { _ in cachedPreflightChecks = computePreflightChecks() }
     }
 
     // MARK: - Preflight Check
 
     private var preflightSection: some View {
-        let checks = preflightChecks
-        let hasErrors = checks.contains { $0.level == .error }
+        let hasErrors = cachedPreflightChecks.contains { $0.level == .error }
         let color: NookColor = hasErrors ? .appRed : .appGreen
 
         return NookCard(color: color) {
@@ -40,7 +45,7 @@ struct PublishView: View {
                 }
                 NookDivider()
 
-                ForEach(checks) { check in
+                ForEach(cachedPreflightChecks) { check in
                     HStack(spacing: 8) {
                         Image(systemName: check.passed ? "checkmark.circle.fill" : "xmark.circle.fill")
                             .foregroundColor(check.passed ? .aiSuccess : (check.level == .warning ? .aiWarning : .aiError))
@@ -90,7 +95,7 @@ struct PublishView: View {
         let level: PublishLogEntry.Level
     }
 
-    private var preflightChecks: [PreflightCheck] {
+    private func computePreflightChecks() -> [PreflightCheck] {
         var checks: [PreflightCheck] = []
 
         let hasRemote = !viewModel.publishRemoteURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty

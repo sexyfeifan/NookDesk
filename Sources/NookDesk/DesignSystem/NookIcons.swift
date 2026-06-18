@@ -44,5 +44,6 @@ enum NookIcon: String, CaseIterable, Identifiable {
     @ViewBuilder
     var image: some View {
         Image(systemName: systemImage)
+            .font(.system(size: 16))
     }
 }

@@ -17,6 +17,8 @@ struct WritingView: View {
     @State private var showPreview = false
     @State private var searchText = ""
     @State private var showNewContentCard = true
+    @State private var cachedCharCount = 0
+    @State private var cachedWordCount = 0
 
     var body: some View {
         NavigationSplitView(columnVisibility: editorColumnVisibility) {
@@ -27,11 +29,21 @@ struct WritingView: View {
                 .navigationSplitViewColumnWidth(min: 600, ideal: 800, max: .infinity)
         }
         .navigationSplitViewStyle(.balanced)
-        .onAppear { refreshInputsFromPost(); startAutoSave() }
+        .onAppear {
+            refreshInputsFromPost()
+            startAutoSave()
+            let body = viewModel.editorPost.body
+            cachedCharCount = body.count
+            cachedWordCount = body.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }.count
+        }
         .onDisappear { stopAutoSave() }
         .onChange(of: viewModel.selectedPostID) { _ in refreshInputsFromPost() }
         .onChange(of: viewModel.editorPost.tags) { _ in refreshInputsFromPost() }
         .onChange(of: viewModel.editorPost.categories) { _ in refreshInputsFromPost() }
+        .onChange(of: viewModel.editorPost.body) { newValue in
+            cachedCharCount = newValue.count
+            cachedWordCount = newValue.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }.count
+        }
         .sheet(isPresented: $showingAIWritingSheet) { aiWritingSheet }
         .alert("确认删除", isPresented: $showDeleteConfirm) {
             Button("取消", role: .cancel) { pendingDeletePost = nil }
@@ -373,10 +385,7 @@ struct WritingView: View {
                     Spacer()
 
                     // Word count
-                    let body = viewModel.editorPost.body
-                    let charCount = body.count
-                    let wordCount = body.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }.count
-                    Text("\(charCount) 字 · \(wordCount) 词")
+                    Text("\\(cachedCharCount) 字 · \\(cachedWordCount) 词")
                         .font(.custom("Nunito-Regular", size: 11))
                         .foregroundColor(.aiTextMuted)
 

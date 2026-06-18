@@ -9,7 +9,10 @@ final class ConfigService {
 
         let ext = fileURL.pathExtension.lowercased()
         if ext == "ts" || ext == "js" || ext == "mts" || ext == "mjs" {
-            return ThemeConfig()
+            // [NookDesk 修复] 对 .ts/.js/.mjs 配置文件（如 Astro），不再返回空配置，
+            // 而是尝试用正则解析 astro.config.mjs 中的 site 和 base 字段，
+            // 返回一个带基本配置的 ThemeConfig，避免 UI 显示空白。
+            return parseAstroConfig(from: fileURL)
         }
 
         let content = try String(contentsOf: fileURL, encoding: .utf8)
@@ -67,13 +70,13 @@ final class ConfigService {
             switch section {
             case "":
                 switch key {
-                case "baseURL": config.baseURL = parseString(value)
-                case "languageCode": config.languageCode = parseString(value)
-                case "title": config.title = parseString(value)
-                case "theme": config.theme = parseString(value)
-                case "sectionPagesMenu": config.sectionPagesMenu = parseString(value)
-                case "pygmentsCodeFences": config.pygmentsCodeFences = parseBool(value)
-                case "pygmentsUseClasses": config.pygmentsUseClasses = parseBool(value)
+                case "baseURL": config.baseURL = StringHelpers.parseString(value)
+                case "languageCode": config.languageCode = StringHelpers.parseString(value)
+                case "title": config.title = StringHelpers.parseString(value)
+                case "theme": config.theme = StringHelpers.parseString(value)
+                case "sectionPagesMenu": config.sectionPagesMenu = StringHelpers.parseString(value)
+                case "pygmentsCodeFences": config.pygmentsCodeFences = StringHelpers.parseBool(value)
+                case "pygmentsUseClasses": config.pygmentsUseClasses = StringHelpers.parseBool(value)
                 default: break
                 }
 
@@ -86,9 +89,9 @@ final class ConfigService {
             case "params.links":
                 if let idx = linkIndex {
                     switch key {
-                    case "title": config.params.links[idx].title = parseString(value)
-                    case "href": config.params.links[idx].href = parseString(value)
-                    case "icon": config.params.links[idx].icon = parseString(value)
+                    case "title": config.params.links[idx].title = StringHelpers.parseString(value)
+                    case "href": config.params.links[idx].href = StringHelpers.parseString(value)
+                    case "icon": config.params.links[idx].icon = StringHelpers.parseString(value)
                     default: break
                     }
                 }
@@ -101,35 +104,35 @@ final class ConfigService {
 
             case "services.googleAnalytics":
                 if key == "ID" {
-                    config.googleAnalyticsID = parseString(value)
+                    config.googleAnalyticsID = StringHelpers.parseString(value)
                 }
 
             case "outputs":
                 if key == "home" {
-                    config.outputsHome = parseStringArray(value)
+                    config.outputsHome = StringHelpers.parseArray(value)
                 }
 
             case "outputFormats.json":
                 switch key {
-                case "mediaType": config.outputFormatJSONMediaType = parseString(value)
-                case "baseName": config.outputFormatJSONBaseName = parseString(value)
-                case "isPlainText": config.outputFormatJSONIsPlainText = parseBool(value)
+                case "mediaType": config.outputFormatJSONMediaType = StringHelpers.parseString(value)
+                case "baseName": config.outputFormatJSONBaseName = StringHelpers.parseString(value)
+                case "isPlainText": config.outputFormatJSONIsPlainText = StringHelpers.parseBool(value)
                 default: break
                 }
 
             case "taxonomies":
-                config.taxonomies[key] = parseString(value)
+                config.taxonomies[key] = StringHelpers.parseString(value)
 
             default:
                 if let currentLanguageCode, section == "languages.\(currentLanguageCode)" {
                     if let idx = config.languageProfiles.firstIndex(where: { $0.code == currentLanguageCode }) {
                         switch key {
                         case "contentDir":
-                            config.languageProfiles[idx].contentDir = parseString(value)
+                            config.languageProfiles[idx].contentDir = StringHelpers.parseString(value)
                         case "languageName", "title":
-                            config.languageProfiles[idx].title = parseString(value)
+                            config.languageProfiles[idx].title = StringHelpers.parseString(value)
                         case "weight":
-                            config.languageProfiles[idx].weight = Int(parseString(value)) ?? config.languageProfiles[idx].weight
+                            config.languageProfiles[idx].weight = Int(StringHelpers.parseString(value)) ?? config.languageProfiles[idx].weight
                         default:
                             break
                         }
@@ -166,27 +169,27 @@ final class ConfigService {
     private func applyManagedConfig(_ config: ThemeConfig, to editor: inout ConfigLineEditor) {
         editor.set(
             key: "baseURL",
-            value: encodeString(config.baseURL),
+            value: StringHelpers.encodeString(config.baseURL),
             section: nil
         )
         editor.set(
             key: "languageCode",
-            value: encodeString(config.languageCode),
+            value: StringHelpers.encodeString(config.languageCode),
             section: nil
         )
         editor.set(
             key: "title",
-            value: encodeString(config.title),
+            value: StringHelpers.encodeString(config.title),
             section: nil
         )
         editor.set(
             key: "theme",
-            value: encodeString(config.theme),
+            value: StringHelpers.encodeString(config.theme),
             section: nil
         )
         editor.set(
             key: "sectionPagesMenu",
-            value: encodeString(config.sectionPagesMenu),
+            value: StringHelpers.encodeString(config.sectionPagesMenu),
             section: nil
         )
         editor.set(
@@ -200,53 +203,53 @@ final class ConfigService {
             section: nil
         )
 
-        editor.set(key: "author", value: encodeString(config.params.author), section: "params")
-        editor.set(key: "description", value: encodeString(config.params.description), section: "params", aliases: ["Description"])
-        editor.set(key: "tagline", value: encodeString(config.params.tagline), section: "params")
-        editor.set(key: "github", value: encodeString(config.params.github), section: "params")
-        editor.set(key: "twitter", value: encodeString(config.params.twitter), section: "params")
-        editor.set(key: "facebook", value: encodeString(config.params.facebook), section: "params")
-        editor.set(key: "linkedin", value: encodeString(config.params.linkedin), section: "params")
-        editor.set(key: "instagram", value: encodeString(config.params.instagram), section: "params")
-        editor.set(key: "tumblr", value: encodeString(config.params.tumblr), section: "params")
-        editor.set(key: "stackoverflow", value: encodeString(config.params.stackoverflow), section: "params")
-        editor.set(key: "bluesky", value: encodeString(config.params.bluesky), section: "params")
-        editor.set(key: "email", value: encodeString(config.params.email), section: "params", aliases: ["Email"])
-        editor.set(key: "url", value: encodeString(config.params.url), section: "params")
-        editor.set(key: "keywords", value: encodeString(config.params.keywords), section: "params", aliases: ["Keywords"])
-        editor.set(key: "favicon", value: encodeString(config.params.favicon), section: "params")
-        editor.set(key: "avatar", value: encodeString(config.params.avatar), section: "params")
-        editor.set(key: "headerIcon", value: encodeString(config.params.headerIcon), section: "params")
-        editor.set(key: "location", value: encodeString(config.params.location), section: "params")
-        editor.set(key: "userStatusEmoji", value: encodeString(config.params.userStatusEmoji), section: "params")
+        editor.set(key: "author", value: StringHelpers.encodeString(config.params.author), section: "params")
+        editor.set(key: "description", value: StringHelpers.encodeString(config.params.description), section: "params", aliases: ["Description"])
+        editor.set(key: "tagline", value: StringHelpers.encodeString(config.params.tagline), section: "params")
+        editor.set(key: "github", value: StringHelpers.encodeString(config.params.github), section: "params")
+        editor.set(key: "twitter", value: StringHelpers.encodeString(config.params.twitter), section: "params")
+        editor.set(key: "facebook", value: StringHelpers.encodeString(config.params.facebook), section: "params")
+        editor.set(key: "linkedin", value: StringHelpers.encodeString(config.params.linkedin), section: "params")
+        editor.set(key: "instagram", value: StringHelpers.encodeString(config.params.instagram), section: "params")
+        editor.set(key: "tumblr", value: StringHelpers.encodeString(config.params.tumblr), section: "params")
+        editor.set(key: "stackoverflow", value: StringHelpers.encodeString(config.params.stackoverflow), section: "params")
+        editor.set(key: "bluesky", value: StringHelpers.encodeString(config.params.bluesky), section: "params")
+        editor.set(key: "email", value: StringHelpers.encodeString(config.params.email), section: "params", aliases: ["Email"])
+        editor.set(key: "url", value: StringHelpers.encodeString(config.params.url), section: "params")
+        editor.set(key: "keywords", value: StringHelpers.encodeString(config.params.keywords), section: "params", aliases: ["Keywords"])
+        editor.set(key: "favicon", value: StringHelpers.encodeString(config.params.favicon), section: "params")
+        editor.set(key: "avatar", value: StringHelpers.encodeString(config.params.avatar), section: "params")
+        editor.set(key: "headerIcon", value: StringHelpers.encodeString(config.params.headerIcon), section: "params")
+        editor.set(key: "location", value: StringHelpers.encodeString(config.params.location), section: "params")
+        editor.set(key: "userStatusEmoji", value: StringHelpers.encodeString(config.params.userStatusEmoji), section: "params")
         editor.set(key: "rss", value: config.params.rss ? "true" : "false", section: "params")
         editor.set(key: "lastmod", value: config.params.lastmod ? "true" : "false", section: "params")
         editor.set(key: "enableGitalk", value: config.params.enableGitalk ? "true" : "false", section: "params")
         editor.set(key: "enableSearch", value: config.params.enableSearch ? "true" : "false", section: "params")
         editor.set(key: "math", value: config.params.math ? "true" : "false", section: "params")
         editor.set(key: "MathJax", value: config.params.mathJax ? "true" : "false", section: "params", aliases: ["mathJax"])
-        editor.set(key: "custom_css", value: encodeArray(config.params.customCSS), section: "params")
-        editor.set(key: "custom_js", value: encodeArray(config.params.customJS), section: "params")
+        editor.set(key: "custom_css", value: StringHelpers.encodeArray(config.params.customCSS), section: "params")
+        editor.set(key: "custom_js", value: StringHelpers.encodeArray(config.params.customJS), section: "params")
 
-        editor.set(key: "clientID", value: encodeString(config.params.gitalk.clientID), section: "params.gitalk")
-        editor.set(key: "clientSecret", value: encodeString(config.params.gitalk.clientSecret), section: "params.gitalk")
-        editor.set(key: "repo", value: encodeString(config.params.gitalk.repo), section: "params.gitalk")
-        editor.set(key: "owner", value: encodeString(config.params.gitalk.owner), section: "params.gitalk")
-        editor.set(key: "admin", value: encodeString(config.params.gitalk.admin), section: "params.gitalk")
-        editor.set(key: "id", value: encodeString(config.params.gitalk.id), section: "params.gitalk")
-        editor.set(key: "labels", value: encodeString(config.params.gitalk.labels), section: "params.gitalk")
+        editor.set(key: "clientID", value: StringHelpers.encodeString(config.params.gitalk.clientID), section: "params.gitalk")
+        editor.set(key: "clientSecret", value: StringHelpers.encodeString(config.params.gitalk.clientSecret), section: "params.gitalk")
+        editor.set(key: "repo", value: StringHelpers.encodeString(config.params.gitalk.repo), section: "params.gitalk")
+        editor.set(key: "owner", value: StringHelpers.encodeString(config.params.gitalk.owner), section: "params.gitalk")
+        editor.set(key: "admin", value: StringHelpers.encodeString(config.params.gitalk.admin), section: "params.gitalk")
+        editor.set(key: "id", value: StringHelpers.encodeString(config.params.gitalk.id), section: "params.gitalk")
+        editor.set(key: "labels", value: StringHelpers.encodeString(config.params.gitalk.labels), section: "params.gitalk")
         editor.set(key: "perPage", value: String(config.params.gitalk.perPage), section: "params.gitalk")
-        editor.set(key: "pagerDirection", value: encodeString(config.params.gitalk.pagerDirection), section: "params.gitalk")
+        editor.set(key: "pagerDirection", value: StringHelpers.encodeString(config.params.gitalk.pagerDirection), section: "params.gitalk")
         editor.set(key: "createIssueManually", value: config.params.gitalk.createIssueManually ? "true" : "false", section: "params.gitalk")
         editor.set(key: "distractionFreeMode", value: config.params.gitalk.distractionFreeMode ? "true" : "false", section: "params.gitalk")
-        editor.set(key: "proxy", value: encodeString(config.params.gitalk.proxy), section: "params.gitalk")
+        editor.set(key: "proxy", value: StringHelpers.encodeString(config.params.gitalk.proxy), section: "params.gitalk")
 
         let linkBlocks = config.params.links.map { link in
             var rows: [String] = []
-            rows.append("title = \(encodeString(link.title))")
-            rows.append("href = \(encodeString(link.href))")
+            rows.append("title = \(StringHelpers.encodeString(link.title))")
+            rows.append("href = \(StringHelpers.encodeString(link.href))")
             if !link.icon.isEmpty {
-                rows.append("icon = \(encodeString(link.icon))")
+                rows.append("icon = \(StringHelpers.encodeString(link.icon))")
             }
             return rows
         }
@@ -260,15 +263,15 @@ final class ConfigService {
             section: "frontmatter"
         )
 
-        editor.set(key: "ID", value: encodeString(config.googleAnalyticsID), section: "services.googleAnalytics")
-        editor.set(key: "home", value: encodeArray(config.outputsHome), section: "outputs")
-        editor.set(key: "mediaType", value: encodeString(config.outputFormatJSONMediaType), section: "outputFormats.json")
-        editor.set(key: "baseName", value: encodeString(config.outputFormatJSONBaseName), section: "outputFormats.json")
+        editor.set(key: "ID", value: StringHelpers.encodeString(config.googleAnalyticsID), section: "services.googleAnalytics")
+        editor.set(key: "home", value: StringHelpers.encodeArray(config.outputsHome), section: "outputs")
+        editor.set(key: "mediaType", value: StringHelpers.encodeString(config.outputFormatJSONMediaType), section: "outputFormats.json")
+        editor.set(key: "baseName", value: StringHelpers.encodeString(config.outputFormatJSONBaseName), section: "outputFormats.json")
         editor.set(key: "isPlainText", value: config.outputFormatJSONIsPlainText ? "true" : "false", section: "outputFormats.json")
 
         let taxonomyRows = config.taxonomies
             .sorted { $0.key < $1.key }
-            .map { "\($0.key) = \(encodeString($0.value))" }
+            .map { "\($0.key) = \(StringHelpers.encodeString($0.value))" }
         editor.replaceSection(name: "taxonomies", rows: taxonomyRows, preferredAnchorSection: "outputFormats.json")
 
         let languageSections = config.languageProfiles
@@ -284,10 +287,10 @@ final class ConfigService {
                 let contentDir = profile.contentDir.trimmingCharacters(in: .whitespacesAndNewlines)
                 let title = profile.title.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !contentDir.isEmpty {
-                    rows.append("contentDir = \(encodeString(contentDir))")
+                    rows.append("contentDir = \(StringHelpers.encodeString(contentDir))")
                 }
                 if !title.isEmpty {
-                    rows.append("languageName = \(encodeString(title))")
+                    rows.append("languageName = \(StringHelpers.encodeString(title))")
                 }
                 rows.append("weight = \(profile.weight)")
                 return ("languages.\(profile.code)", rows)
@@ -298,67 +301,67 @@ final class ConfigService {
     private func buildManagedConfigLines(_ config: ThemeConfig) -> [String] {
         var lines: [String] = []
 
-        lines.append("baseURL = \(encodeString(config.baseURL))")
-        lines.append("languageCode = \(encodeString(config.languageCode))")
-        lines.append("title = \(encodeString(config.title))")
-        lines.append("theme = \(encodeString(config.theme))")
-        lines.append("sectionPagesMenu = \(encodeString(config.sectionPagesMenu))")
+        lines.append("baseURL = \(StringHelpers.encodeString(config.baseURL))")
+        lines.append("languageCode = \(StringHelpers.encodeString(config.languageCode))")
+        lines.append("title = \(StringHelpers.encodeString(config.title))")
+        lines.append("theme = \(StringHelpers.encodeString(config.theme))")
+        lines.append("sectionPagesMenu = \(StringHelpers.encodeString(config.sectionPagesMenu))")
         lines.append("pygmentsCodeFences = \(config.pygmentsCodeFences ? "true" : "false")")
         lines.append("pygmentsUseClasses = \(config.pygmentsUseClasses ? "true" : "false")")
         lines.append("")
 
         lines.append("[params]")
-        lines.append("  author = \(encodeString(config.params.author))")
-        lines.append("  description = \(encodeString(config.params.description))")
-        lines.append("  tagline = \(encodeString(config.params.tagline))")
-        lines.append("  github = \(encodeString(config.params.github))")
-        lines.append("  twitter = \(encodeString(config.params.twitter))")
-        lines.append("  facebook = \(encodeString(config.params.facebook))")
-        lines.append("  linkedin = \(encodeString(config.params.linkedin))")
-        lines.append("  instagram = \(encodeString(config.params.instagram))")
-        lines.append("  tumblr = \(encodeString(config.params.tumblr))")
-        lines.append("  stackoverflow = \(encodeString(config.params.stackoverflow))")
-        lines.append("  bluesky = \(encodeString(config.params.bluesky))")
-        lines.append("  email = \(encodeString(config.params.email))")
-        lines.append("  url = \(encodeString(config.params.url))")
-        lines.append("  keywords = \(encodeString(config.params.keywords))")
-        lines.append("  favicon = \(encodeString(config.params.favicon))")
-        lines.append("  avatar = \(encodeString(config.params.avatar))")
-        lines.append("  headerIcon = \(encodeString(config.params.headerIcon))")
-        lines.append("  location = \(encodeString(config.params.location))")
-        lines.append("  userStatusEmoji = \(encodeString(config.params.userStatusEmoji))")
+        lines.append("  author = \(StringHelpers.encodeString(config.params.author))")
+        lines.append("  description = \(StringHelpers.encodeString(config.params.description))")
+        lines.append("  tagline = \(StringHelpers.encodeString(config.params.tagline))")
+        lines.append("  github = \(StringHelpers.encodeString(config.params.github))")
+        lines.append("  twitter = \(StringHelpers.encodeString(config.params.twitter))")
+        lines.append("  facebook = \(StringHelpers.encodeString(config.params.facebook))")
+        lines.append("  linkedin = \(StringHelpers.encodeString(config.params.linkedin))")
+        lines.append("  instagram = \(StringHelpers.encodeString(config.params.instagram))")
+        lines.append("  tumblr = \(StringHelpers.encodeString(config.params.tumblr))")
+        lines.append("  stackoverflow = \(StringHelpers.encodeString(config.params.stackoverflow))")
+        lines.append("  bluesky = \(StringHelpers.encodeString(config.params.bluesky))")
+        lines.append("  email = \(StringHelpers.encodeString(config.params.email))")
+        lines.append("  url = \(StringHelpers.encodeString(config.params.url))")
+        lines.append("  keywords = \(StringHelpers.encodeString(config.params.keywords))")
+        lines.append("  favicon = \(StringHelpers.encodeString(config.params.favicon))")
+        lines.append("  avatar = \(StringHelpers.encodeString(config.params.avatar))")
+        lines.append("  headerIcon = \(StringHelpers.encodeString(config.params.headerIcon))")
+        lines.append("  location = \(StringHelpers.encodeString(config.params.location))")
+        lines.append("  userStatusEmoji = \(StringHelpers.encodeString(config.params.userStatusEmoji))")
         lines.append("  rss = \(config.params.rss ? "true" : "false")")
         lines.append("  lastmod = \(config.params.lastmod ? "true" : "false")")
         lines.append("  enableGitalk = \(config.params.enableGitalk ? "true" : "false")")
         lines.append("  enableSearch = \(config.params.enableSearch ? "true" : "false")")
         lines.append("  math = \(config.params.math ? "true" : "false")")
         lines.append("  MathJax = \(config.params.mathJax ? "true" : "false")")
-        lines.append("  custom_css = \(encodeArray(config.params.customCSS))")
-        lines.append("  custom_js = \(encodeArray(config.params.customJS))")
+        lines.append("  custom_css = \(StringHelpers.encodeArray(config.params.customCSS))")
+        lines.append("  custom_js = \(StringHelpers.encodeArray(config.params.customJS))")
         lines.append("")
 
         lines.append("  [params.gitalk]")
-        lines.append("    clientID = \(encodeString(config.params.gitalk.clientID))")
-        lines.append("    clientSecret = \(encodeString(config.params.gitalk.clientSecret))")
-        lines.append("    repo = \(encodeString(config.params.gitalk.repo))")
-        lines.append("    owner = \(encodeString(config.params.gitalk.owner))")
-        lines.append("    admin = \(encodeString(config.params.gitalk.admin))")
-        lines.append("    id = \(encodeString(config.params.gitalk.id))")
-        lines.append("    labels = \(encodeString(config.params.gitalk.labels))")
+        lines.append("    clientID = \(StringHelpers.encodeString(config.params.gitalk.clientID))")
+        lines.append("    clientSecret = \(StringHelpers.encodeString(config.params.gitalk.clientSecret))")
+        lines.append("    repo = \(StringHelpers.encodeString(config.params.gitalk.repo))")
+        lines.append("    owner = \(StringHelpers.encodeString(config.params.gitalk.owner))")
+        lines.append("    admin = \(StringHelpers.encodeString(config.params.gitalk.admin))")
+        lines.append("    id = \(StringHelpers.encodeString(config.params.gitalk.id))")
+        lines.append("    labels = \(StringHelpers.encodeString(config.params.gitalk.labels))")
         lines.append("    perPage = \(config.params.gitalk.perPage)")
-        lines.append("    pagerDirection = \(encodeString(config.params.gitalk.pagerDirection))")
+        lines.append("    pagerDirection = \(StringHelpers.encodeString(config.params.gitalk.pagerDirection))")
         lines.append("    createIssueManually = \(config.params.gitalk.createIssueManually ? "true" : "false")")
         lines.append("    distractionFreeMode = \(config.params.gitalk.distractionFreeMode ? "true" : "false")")
-        lines.append("    proxy = \(encodeString(config.params.gitalk.proxy))")
+        lines.append("    proxy = \(StringHelpers.encodeString(config.params.gitalk.proxy))")
 
         if !config.params.links.isEmpty {
             lines.append("")
             for link in config.params.links {
                 lines.append("  [[params.links]]")
-                lines.append("    title = \(encodeString(link.title))")
-                lines.append("    href = \(encodeString(link.href))")
+                lines.append("    title = \(StringHelpers.encodeString(link.title))")
+                lines.append("    href = \(StringHelpers.encodeString(link.href))")
                 if !link.icon.isEmpty {
-                    lines.append("    icon = \(encodeString(link.icon))")
+                    lines.append("    icon = \(StringHelpers.encodeString(link.icon))")
                 }
             }
         }
@@ -374,23 +377,23 @@ final class ConfigService {
         lines.append("")
         lines.append("[services]")
         lines.append("  [services.googleAnalytics]")
-        lines.append("    ID = \(encodeString(config.googleAnalyticsID))")
+        lines.append("    ID = \(StringHelpers.encodeString(config.googleAnalyticsID))")
 
         lines.append("")
         lines.append("[outputs]")
-        lines.append("  home = \(encodeArray(config.outputsHome))")
+        lines.append("  home = \(StringHelpers.encodeArray(config.outputsHome))")
 
         lines.append("")
         lines.append("[outputFormats.json]")
-        lines.append("  mediaType = \(encodeString(config.outputFormatJSONMediaType))")
-        lines.append("  baseName = \(encodeString(config.outputFormatJSONBaseName))")
+        lines.append("  mediaType = \(StringHelpers.encodeString(config.outputFormatJSONMediaType))")
+        lines.append("  baseName = \(StringHelpers.encodeString(config.outputFormatJSONBaseName))")
         lines.append("  isPlainText = \(config.outputFormatJSONIsPlainText ? "true" : "false")")
 
         if !config.taxonomies.isEmpty {
             lines.append("")
             lines.append("[taxonomies]")
             for entry in config.taxonomies.sorted(by: { $0.key < $1.key }) {
-                lines.append("  \(entry.key) = \(encodeString(entry.value))")
+                lines.append("  \(entry.key) = \(StringHelpers.encodeString(entry.value))")
             }
         }
 
@@ -406,10 +409,10 @@ final class ConfigService {
                 lines.append("")
                 lines.append("[languages.\(code)]")
                 if !profile.contentDir.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    lines.append("  contentDir = \(encodeString(profile.contentDir))")
+                    lines.append("  contentDir = \(StringHelpers.encodeString(profile.contentDir))")
                 }
                 if !profile.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    lines.append("  languageName = \(encodeString(profile.title))")
+                    lines.append("  languageName = \(StringHelpers.encodeString(profile.title))")
                 }
                 lines.append("  weight = \(profile.weight)")
             }
@@ -419,53 +422,84 @@ final class ConfigService {
 
     private func applyParam(key: String, value: String, to config: inout ThemeConfig) {
         switch key {
-        case "author": config.params.author = parseString(value)
-        case "description", "Description": config.params.description = parseString(value)
-        case "tagline": config.params.tagline = parseString(value)
-        case "github": config.params.github = parseString(value)
-        case "twitter": config.params.twitter = parseString(value)
-        case "facebook": config.params.facebook = parseString(value)
-        case "linkedin": config.params.linkedin = parseString(value)
-        case "instagram": config.params.instagram = parseString(value)
-        case "tumblr": config.params.tumblr = parseString(value)
-        case "stackoverflow": config.params.stackoverflow = parseString(value)
-        case "bluesky": config.params.bluesky = parseString(value)
-        case "email", "Email": config.params.email = parseString(value)
-        case "url": config.params.url = parseString(value)
-        case "keywords", "Keywords": config.params.keywords = parseString(value)
-        case "favicon": config.params.favicon = parseString(value)
-        case "avatar": config.params.avatar = parseString(value)
-        case "headerIcon": config.params.headerIcon = parseString(value)
-        case "location": config.params.location = parseString(value)
-        case "userStatusEmoji": config.params.userStatusEmoji = parseString(value)
-        case "rss": config.params.rss = parseBool(value)
-        case "lastmod": config.params.lastmod = parseBool(value)
-        case "enableGitalk": config.params.enableGitalk = parseBool(value)
-        case "enableSearch": config.params.enableSearch = parseBool(value)
-        case "math": config.params.math = parseBool(value)
-        case "MathJax", "mathJax": config.params.mathJax = parseBool(value)
-        case "custom_css": config.params.customCSS = parseStringArray(value)
-        case "custom_js": config.params.customJS = parseStringArray(value)
+        case "author": config.params.author = StringHelpers.parseString(value)
+        case "description", "Description": config.params.description = StringHelpers.parseString(value)
+        case "tagline": config.params.tagline = StringHelpers.parseString(value)
+        case "github": config.params.github = StringHelpers.parseString(value)
+        case "twitter": config.params.twitter = StringHelpers.parseString(value)
+        case "facebook": config.params.facebook = StringHelpers.parseString(value)
+        case "linkedin": config.params.linkedin = StringHelpers.parseString(value)
+        case "instagram": config.params.instagram = StringHelpers.parseString(value)
+        case "tumblr": config.params.tumblr = StringHelpers.parseString(value)
+        case "stackoverflow": config.params.stackoverflow = StringHelpers.parseString(value)
+        case "bluesky": config.params.bluesky = StringHelpers.parseString(value)
+        case "email", "Email": config.params.email = StringHelpers.parseString(value)
+        case "url": config.params.url = StringHelpers.parseString(value)
+        case "keywords", "Keywords": config.params.keywords = StringHelpers.parseString(value)
+        case "favicon": config.params.favicon = StringHelpers.parseString(value)
+        case "avatar": config.params.avatar = StringHelpers.parseString(value)
+        case "headerIcon": config.params.headerIcon = StringHelpers.parseString(value)
+        case "location": config.params.location = StringHelpers.parseString(value)
+        case "userStatusEmoji": config.params.userStatusEmoji = StringHelpers.parseString(value)
+        case "rss": config.params.rss = StringHelpers.parseBool(value)
+        case "lastmod": config.params.lastmod = StringHelpers.parseBool(value)
+        case "enableGitalk": config.params.enableGitalk = StringHelpers.parseBool(value)
+        case "enableSearch": config.params.enableSearch = StringHelpers.parseBool(value)
+        case "math": config.params.math = StringHelpers.parseBool(value)
+        case "MathJax", "mathJax": config.params.mathJax = StringHelpers.parseBool(value)
+        case "custom_css": config.params.customCSS = StringHelpers.parseArray(value)
+        case "custom_js": config.params.customJS = StringHelpers.parseArray(value)
         default: break
         }
     }
 
     private func applyGitalkParam(key: String, value: String, to config: inout ThemeConfig) {
         switch key {
-        case "clientID": config.params.gitalk.clientID = parseString(value)
-        case "clientSecret": config.params.gitalk.clientSecret = parseString(value)
-        case "repo": config.params.gitalk.repo = parseString(value)
-        case "owner": config.params.gitalk.owner = parseString(value)
-        case "admin": config.params.gitalk.admin = parseString(value)
-        case "id": config.params.gitalk.id = parseString(value)
-        case "labels": config.params.gitalk.labels = parseString(value)
-        case "perPage": config.params.gitalk.perPage = Int(parseString(value)) ?? 15
-        case "pagerDirection": config.params.gitalk.pagerDirection = parseString(value)
-        case "createIssueManually": config.params.gitalk.createIssueManually = parseBool(value)
-        case "distractionFreeMode": config.params.gitalk.distractionFreeMode = parseBool(value)
-        case "proxy": config.params.gitalk.proxy = parseString(value)
+        case "clientID": config.params.gitalk.clientID = StringHelpers.parseString(value)
+        case "clientSecret": config.params.gitalk.clientSecret = StringHelpers.parseString(value)
+        case "repo": config.params.gitalk.repo = StringHelpers.parseString(value)
+        case "owner": config.params.gitalk.owner = StringHelpers.parseString(value)
+        case "admin": config.params.gitalk.admin = StringHelpers.parseString(value)
+        case "id": config.params.gitalk.id = StringHelpers.parseString(value)
+        case "labels": config.params.gitalk.labels = StringHelpers.parseString(value)
+        case "perPage": config.params.gitalk.perPage = Int(StringHelpers.parseString(value)) ?? 15
+        case "pagerDirection": config.params.gitalk.pagerDirection = StringHelpers.parseString(value)
+        case "createIssueManually": config.params.gitalk.createIssueManually = StringHelpers.parseBool(value)
+        case "distractionFreeMode": config.params.gitalk.distractionFreeMode = StringHelpers.parseBool(value)
+        case "proxy": config.params.gitalk.proxy = StringHelpers.parseString(value)
         default: break
         }
+    }
+
+    // MARK: - Astro 配置解析（正则提取 site 和 base）
+    // [NookDesk 修复] Astro 的配置文件是 .mjs/.ts/.js，无法被 TOML 解析器读取。
+    // 这里用正则从中提取 site 和 base 字段，填充到 ThemeConfig，
+    // 使设置界面能显示基本站点信息。
+    private func parseAstroConfig(from fileURL: URL) -> ThemeConfig {
+        var config = ThemeConfig()
+        guard let content = try? String(contentsOf: fileURL, encoding: .utf8) else {
+            return config
+        }
+        // 匹配 site: 'https://...' 或 site: "https://..."
+        let sitePattern = #"site\s*:\s*['"]([^'"]+)['"]"#
+        if let regex = try? NSRegularExpression(pattern: sitePattern),
+           let match = regex.firstMatch(in: content, range: NSRange(content.startIndex..., in: content)),
+           let range = Range(match.range(at: 1), in: content) {
+            config.baseURL = String(content[range])
+        }
+        // 匹配 base: '/' 或 base: "/subpath"
+        let basePattern = #"base\s*:\s*['"]([^'"]*)['"]"#
+        if let regex = try? NSRegularExpression(pattern: basePattern),
+           let match = regex.firstMatch(in: content, range: NSRange(content.startIndex..., in: content)),
+           let range = Range(match.range(at: 1), in: content) {
+            let base = String(content[range])
+            if !base.isEmpty && base != "/" {
+                let trimmedBase = config.baseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                let trimmedSub = base.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                config.baseURL = trimmedBase + "/" + trimmedSub + "/"
+            }
+        }
+        return config
     }
 
     private func splitKeyValue(_ line: String) -> (String, String)? {
@@ -495,52 +529,8 @@ final class ConfigService {
         return value
     }
 
-    private func parseString(_ raw: String) -> String {
-        var value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        if value.hasPrefix("\"") && value.hasSuffix("\"") && value.count >= 2 {
-            value.removeFirst()
-            value.removeLast()
-        } else if value.hasPrefix("'") && value.hasSuffix("'") && value.count >= 2 {
-            value.removeFirst()
-            value.removeLast()
-        }
-        return value
-    }
-
-    private func parseBool(_ raw: String) -> Bool {
-        parseString(raw).lowercased() == "true"
-    }
-
-    private func parseStringArray(_ raw: String) -> [String] {
-        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.hasPrefix("[") && trimmed.hasSuffix("]") else {
-            return parseString(trimmed).isEmpty ? [] : [parseString(trimmed)]
-        }
-
-        let body = String(trimmed.dropFirst().dropLast())
-        if body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return []
-        }
-
-        return body
-            .split(separator: ",")
-            .map { parseString(String($0)) }
-            .filter { !$0.isEmpty }
-    }
-
-    private func encodeString(_ value: String) -> String {
-        let escaped = value
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
-        return "\"\(escaped)\""
-    }
-
-    private func encodeArray(_ values: [String]) -> String {
-        if values.isEmpty {
-            return "[]"
-        }
-        return "[" + values.map { encodeString($0) }.joined(separator: ", ") + "]"
-    }
+    // parseString, parseBool, parseArray, encodeString, encodeArray
+    // are now provided by StringHelpers.
 }
 
 private struct ConfigLineEditor {
