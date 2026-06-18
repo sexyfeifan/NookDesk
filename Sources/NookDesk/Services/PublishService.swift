@@ -4,6 +4,23 @@ final class PublishService {
     private let runner = ProcessRunner()
     private let fm = FileManager.default
 
+    // MARK: - Signal-safe cleanup for temp askpass scripts
+    static var pendingAskPassPaths: Set<String> = []
+    private static var signalCleanupInstalled = false
+
+    static func installSignalCleanupIfNeeded() {
+        guard !signalCleanupInstalled else { return }
+        signalCleanupInstalled = true
+        let cleanup: @convention(c) (Int32) -> Void = { sig in
+            for path in pendingAskPassPaths {
+                try? FileManager.default.removeItem(atPath: path)
+            }
+            _exit(128 + sig)
+        }
+        signal(SIGINT, cleanup)
+        signal(SIGTERM, cleanup)
+    }
+
     func runBuild(project: BlogProject) throws -> String {
         let be = project.backend
         let cmd = be.buildCommand(project: project)
@@ -341,9 +358,20 @@ final class PublishService {
         """
         try script.write(to: scriptURL, atomically: true, encoding: .utf8)
         try fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: scriptURL.path)
+
+        // Register signal cleanup to remove temp script on crash/exit
+        let cleanupAction: () -> Void = {
+            try? FileManager.default.removeItem(at: scriptURL)
+        }
+        #if os(macOS)
+        // Signal handler cleanup — store path in a global so C-convention handler can access it
+        Self.pendingAskPassPaths.insert(scriptURL.path)
+        Self.installSignalCleanupIfNeeded()
+        #endif
+
         return GitAuthContext(
             environment: ["GIT_ASKPASS": scriptURL.path, "AID_GITHUB_TOKEN": token, "GCM_INTERACTIVE": "Never", "GIT_TERMINAL_PROMPT": "0"],
-            cleanup: { try? FileManager.default.removeItem(at: scriptURL) }
+            cleanup: cleanupAction
         )
     }
 

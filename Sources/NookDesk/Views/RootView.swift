@@ -54,9 +54,25 @@ struct RootView: View {
                 bottomStatusBar
             }
         }
-        .overlay {
+        .overlay(alignment: .top) {
             if viewModel.isBusy {
-                NookLoadingOverlay(message: viewModel.statusText.isEmpty ? "处理中..." : viewModel.statusText)
+                VStack(spacing: 4) {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .controlSize(.mini)
+                        Text(viewModel.statusText.isEmpty ? "处理中..." : viewModel.statusText)
+                            .font(.custom("Nunito-Medium", size: 12))
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(Color.aiPrimary.opacity(0.9))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+                .padding(.top, 8)
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .animation(NookAnimations.nookEase, value: viewModel.isBusy)
             }
         }
     }

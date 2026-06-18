@@ -3,6 +3,7 @@ import SwiftUI
 struct LogsView: View {
     @ObservedObject var viewModel: AppViewModel
     @State private var selectedCategory: String = "全部"
+    @State private var showClearConfirm = false
 
     private let categories = ["全部", "写作", "发布", "设置", "系统"]
 
@@ -26,9 +27,15 @@ struct LogsView: View {
                 Spacer()
 
                 NookButton(.danger, size: .small, label: "清除日志") {
-                    viewModel.globalLogs.removeAll()
+                    showClearConfirm = true
                 }
                 .disabled(viewModel.globalLogs.isEmpty)
+                .alert("确认清除", isPresented: $showClearConfirm) {
+                    Button("取消", role: .cancel) {}
+                    Button("清除", role: .destructive) { viewModel.globalLogs.removeAll() }
+                } message: {
+                    Text("确定要清除所有日志吗？此操作不可撤销。")
+                }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)

@@ -9,12 +9,110 @@ struct PublishView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 publishHeader
+                preflightSection
                 statusSection
                 publishActionSection
                 logSection
             }
             .padding(24)
         }
+    }
+
+    // MARK: - Preflight Check
+
+    private var preflightSection: some View {
+        let checks = preflightChecks
+        let hasErrors = checks.contains { $0.level == .error }
+        let color: NookColor = hasErrors ? .appRed : .appGreen
+
+        return NookCard(color: color) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text("发布前检查")
+                        .font(.custom("Nunito-Bold", size: 15))
+                        .foregroundColor(.aiTextHeader)
+                    Spacer()
+                    if !hasErrors {
+                        StatusBadge(text: "全部通过", level: .ok)
+                    } else {
+                        StatusBadge(text: "存在问题", level: .error)
+                    }
+                }
+                NookDivider()
+
+                ForEach(checks) { check in
+                    HStack(spacing: 8) {
+                        Image(systemName: check.passed ? "checkmark.circle.fill" : "xmark.circle.fill")
+                            .foregroundColor(check.passed ? .aiSuccess : (check.level == .warning ? .aiWarning : .aiError))
+                            .font(.system(size: 12))
+                        Text(check.name)
+                            .font(.custom("Nunito-Medium", size: 12))
+                            .foregroundColor(.aiTextBody)
+                        Spacer()
+                        Text(check.passed ? "通过" : check.message)
+                            .font(.custom("Nunito-Regular", size: 11))
+                            .foregroundColor(check.passed ? .aiTextMuted : .aiError)
+                    }
+                }
+
+                // Change summary
+                NookDivider()
+                let draftCount = viewModel.posts.filter(\.draft).count
+                let publishedCount = viewModel.posts.count - draftCount
+                HStack(spacing: 16) {
+                    changeSummaryBadge(icon: "doc.text", label: "文章总数", value: "\(viewModel.posts.count)")
+                    changeSummaryBadge(icon: "checkmark.circle", label: "已发布", value: "\(publishedCount)")
+                    changeSummaryBadge(icon: "pencil.circle", label: "草稿", value: "\(draftCount)")
+                }
+            }
+        }
+    }
+
+    private func changeSummaryBadge(icon: String, label: String, value: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 10))
+                .foregroundColor(.aiTextMuted)
+            Text("\(label): ")
+                .font(.custom("Nunito-Regular", size: 11))
+                .foregroundColor(.aiTextMuted)
+            Text(value)
+                .font(.custom("Nunito-Bold", size: 11))
+                .foregroundColor(.aiTextBody)
+        }
+    }
+
+    private struct PreflightCheck: Identifiable {
+        let id = UUID()
+        let name: String
+        let passed: Bool
+        let message: String
+        let level: PublishLogEntry.Level
+    }
+
+    private var preflightChecks: [PreflightCheck] {
+        var checks: [PreflightCheck] = []
+
+        let hasRemote = !viewModel.publishRemoteURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        checks.append(PreflightCheck(name: "远程仓库", passed: hasRemote, message: "未配置", level: .error))
+
+        let hasToken = !viewModel.githubTokenUsageSummary.contains("未配置")
+        checks.append(PreflightCheck(name: "GitHub Token", passed: hasToken, message: "未配置", level: .error))
+
+        let isGitRepo = FileManager.default.fileExists(atPath: viewModel.project.rootURL.appendingPathComponent(".git").path)
+        checks.append(PreflightCheck(name: "Git 仓库", passed: isGitRepo, message: "不是 Git 仓库", level: .error))
+
+        let hasWorkflow = viewModel.hasGitHubPagesWorkflow
+        checks.append(PreflightCheck(name: "Pages Workflow", passed: hasWorkflow, message: "未检测到", level: .warning))
+
+        let draftCount = viewModel.posts.filter(\.draft).count
+        if draftCount > 0 {
+            checks.append(PreflightCheck(name: "草稿文章", passed: false, message: "有 \(draftCount) 篇草稿", level: .info))
+        } else {
+            checks.append(PreflightCheck(name: "草稿文章", passed: true, message: "", level: .info))
+        }
+
+        return checks
     }
 
     // MARK: - Header

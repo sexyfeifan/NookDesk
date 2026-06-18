@@ -934,11 +934,34 @@ final class AppViewModel: ObservableObject {
                     baseURL: self.aiBaseURL.trimmingCharacters(in: .whitespacesAndNewlines),
                     model: self.aiModel.trimmingCharacters(in: .whitespacesAndNewlines)
                 )
-                let generated = try await self.aiService.writeMarkdown(
-                    input: source,
-                    profile: profile,
-                    apiKey: self.aiAPIKey
-                )
+                // Build conversation history from recent messages (last 10 turns)
+                let recentMessages = Array(self.aiWritingMessages.suffix(10))
+                var history: [(role: String, content: String)] = []
+                for msg in recentMessages {
+                    let role: String
+                    switch msg.role {
+                    case .user: role = "user"
+                    case .assistant: role = "assistant"
+                    case .system: continue // skip system messages
+                    }
+                    history.append((role: role, content: msg.content))
+                }
+                history.append((role: "user", content: source))
+
+                let generated: String
+                if history.count > 1 {
+                    generated = try await self.aiService.writeWithHistory(
+                        messages: history,
+                        profile: profile,
+                        apiKey: self.aiAPIKey
+                    )
+                } else {
+                    generated = try await self.aiService.writeMarkdown(
+                        input: source,
+                        profile: profile,
+                        apiKey: self.aiAPIKey
+                    )
+                }
                 onComplete(generated)
                 self.statusText = "AI 写作完成，结果已追加到正文。"
                 self.finishAITaskProgress(.writing, success: true)

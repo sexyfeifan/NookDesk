@@ -489,7 +489,8 @@ struct WizardView: View {
                 .font(.custom("Nunito-Medium", size: 13))
                 .foregroundColor(.aiTextSecondary)
 
-            NookInput("github_pat_xxx 或 ghp_xxx", text: $githubToken)
+            SecureField("github_pat_xxx 或 ghp_xxx", text: $githubToken)
+                .textFieldStyle(.roundedBorder)
 
             HStack(spacing: 8) {
                 Image(systemName: "info.circle")
@@ -533,7 +534,7 @@ struct WizardView: View {
 
     private var stepComplete: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("配置完成")
+            Text("配置完成 🎉")
                 .font(.custom("Nunito-Bold", size: 20))
                 .foregroundColor(.aiTextHeader)
 
@@ -547,9 +548,33 @@ struct WizardView: View {
                 }
             }
 
+            NookCard(color: .appBlue) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("接下来你可以：")
+                        .font(.custom("Nunito-Bold", size: 14))
+                        .foregroundColor(.aiTextHeader)
+                    stepSuggestion("square.and.pencil", "切换到「写作」标签，创建你的第一篇文章")
+                    stepSuggestion("paintbrush.fill", "切换到「页面」标签，修改站点标题和描述")
+                    stepSuggestion("gearshape.fill", "在「设置」中配置 AI 写作助手")
+                    stepSuggestion("paperplane.fill", "写完后在「发布」页一键推送到 GitHub Pages")
+                }
+            }
+
             NookButton(.default, size: .small, label: "重新开始引导") {
                 resetWizard()
             }
+        }
+    }
+
+    private func stepSuggestion(_ icon: String, _ text: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 12))
+                .foregroundColor(.aiPrimary)
+                .frame(width: 20)
+            Text(text)
+                .font(.custom("Nunito-Regular", size: 12))
+                .foregroundColor(.aiTextBody)
         }
     }
 
@@ -712,16 +737,55 @@ struct WizardView: View {
         isTestingConnection = true
         connectionTestResult = nil
         Task {
-            try? await Task.sleep(nanoseconds: 500_000_000)
             let url = githubRemoteURL.trimmingCharacters(in: .whitespacesAndNewlines)
-            if url.isEmpty {
-                connectionTestResult = "请输入仓库地址"
-            } else if url.contains("github.com") {
-                connectionTestResult = "地址格式正确"
-            } else {
-                connectionTestResult = "地址格式可能有误"
+            guard !url.isEmpty else {
+                await MainActor.run {
+                    connectionTestResult = "请输入仓库地址"
+                    isTestingConnection = false
+                }
+                return
             }
-            isTestingConnection = false
+
+            // Format check
+            guard url.contains("github.com") else {
+                await MainActor.run {
+                    connectionTestResult = "地址格式可能有误（非 GitHub 地址）"
+                    isTestingConnection = false
+                }
+                return
+            }
+
+            // Real network check — try to reach the GitHub repo API
+            let repoPath = url
+                .replacingOccurrences(of: "https://github.com/", with: "")
+                .replacingOccurrences(of: ".git", with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let apiURL = URL(string: "https://api.github.com/repos/\(repoPath)")
+            var apiRequest = URLRequest(url: apiURL!)
+            apiRequest.setValue("NookDesk/1.0", forHTTPHeaderField: "User-Agent")
+            apiRequest.timeoutInterval = 10
+
+            do {
+                let (_, apiResponse) = try await URLSession.shared.data(for: apiRequest)
+                let code = (apiResponse as? HTTPURLResponse)?.statusCode ?? -1
+                await MainActor.run {
+                    if 200..<300 ~= code {
+                        connectionTestResult = "✅ 连接成功，仓库可达"
+                    } else if code == 404 {
+                        connectionTestResult = "❌ 仓库不存在或为私有仓库"
+                    } else if code == 403 {
+                        connectionTestResult = "⚠️ 需要认证（请配置 Token）"
+                    } else {
+                        connectionTestResult = "⚠️ 响应异常 (HTTP \(code))"
+                    }
+                    isTestingConnection = false
+                }
+            } catch {
+                await MainActor.run {
+                    connectionTestResult = "⚠️ 网络不通，跳过验证（格式正确）"
+                    isTestingConnection = false
+                }
+            }
         }
     }
 
@@ -729,16 +793,55 @@ struct WizardView: View {
         isTestingToken = true
         tokenTestResult = nil
         Task {
-            try? await Task.sleep(nanoseconds: 500_000_000)
             let token = githubToken.trimmingCharacters(in: .whitespacesAndNewlines)
-            if token.isEmpty {
-                tokenTestResult = "请输入 Token"
-            } else if token.hasPrefix("ghp_") || token.hasPrefix("github_pat_") {
-                tokenTestResult = "Token 格式正确"
-            } else {
-                tokenTestResult = "Token 格式可能有误"
+            guard !token.isEmpty else {
+                await MainActor.run {
+                    tokenTestResult = "请输入 Token"
+                    isTestingToken = false
+                }
+                return
             }
-            isTestingToken = false
+
+            // Format check
+            guard token.hasPrefix("ghp_") || token.hasPrefix("github_pat_") else {
+                await MainActor.run {
+                    tokenTestResult = "Token 格式可能有误（应以 ghp_ 或 github_pat_ 开头）"
+                    isTestingToken = false
+                }
+                return
+            }
+
+            // Real API check
+            guard let url = URL(string: "https://api.github.com/user") else {
+                await MainActor.run { tokenTestResult = "❌ API 地址异常"; isTestingToken = false }
+                return
+            }
+            var request = URLRequest(url: url)
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            request.setValue("NookDesk/1.0", forHTTPHeaderField: "User-Agent")
+            request.timeoutInterval = 10
+
+            do {
+                let (_, response) = try await URLSession.shared.data(for: request)
+                let code = (response as? HTTPURLResponse)?.statusCode ?? -1
+                await MainActor.run {
+                    if 200..<300 ~= code {
+                        tokenTestResult = "✅ Token 有效"
+                    } else if code == 401 {
+                        tokenTestResult = "❌ Token 已过期或无效"
+                    } else if code == 403 {
+                        tokenTestResult = "⚠️ Token 权限不足"
+                    } else {
+                        tokenTestResult = "❌ 验证失败 (HTTP \(code))"
+                    }
+                    isTestingToken = false
+                }
+            } catch {
+                await MainActor.run {
+                    tokenTestResult = "⚠️ 网络不通，跳过验证"
+                    isTestingToken = false
+                }
+            }
         }
     }
 

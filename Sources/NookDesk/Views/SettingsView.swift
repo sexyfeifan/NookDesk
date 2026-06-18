@@ -3,7 +3,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var viewModel: AppViewModel
-    @State private var expandedSections: Set<String> = ["project"]
+    @State private var expandedSections: Set<String> = ["project", "github"]
     @State private var customCSSInput = ""
     @State private var customJSInput = ""
     @State private var aiTestResponseTime: String?
@@ -221,11 +221,13 @@ struct SettingsView: View {
             }
 
             settingsRow("Fine-grained Token") {
-                NookInput("github_pat_xxx", text: $viewModel.githubFineGrainedToken)
+                SecureField("github_pat_xxx", text: $viewModel.githubFineGrainedToken)
+                    .textFieldStyle(.roundedBorder)
             }
 
             settingsRow("Classic Token") {
-                NookInput("ghp_xxx", text: $viewModel.githubClassicToken)
+                SecureField("ghp_xxx", text: $viewModel.githubClassicToken)
+                    .textFieldStyle(.roundedBorder)
             }
 
             HStack(spacing: 12) {
@@ -362,6 +364,22 @@ struct SettingsView: View {
                     viewModel.saveThemeConfig()
                 }
                 Spacer()
+            }
+
+            NookDivider()
+
+            settingsRow("自定义 CSS") {
+                TextEditor(text: $customCSSInput)
+                    .font(.system(.caption, design: .monospaced))
+                    .frame(minHeight: 80)
+                    .border(Color.aiBorderLight, width: 1)
+            }
+
+            settingsRow("自定义 JS") {
+                TextEditor(text: $customJSInput)
+                    .font(.system(.caption, design: .monospaced))
+                    .frame(minHeight: 80)
+                    .border(Color.aiBorderLight, width: 1)
             }
         }
     }

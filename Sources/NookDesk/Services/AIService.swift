@@ -109,6 +109,37 @@ struct AIService {
         apiKey: String,
         temperature: Double
     ) async throws -> String {
+        return try await requestCompletion(
+            systemPrompt: systemPrompt,
+            messages: [["role": "user", "content": userPrompt]],
+            profile: profile,
+            apiKey: apiKey,
+            temperature: temperature
+        )
+    }
+
+    func writeWithHistory(
+        messages: [(role: String, content: String)],
+        profile: AIProfile,
+        apiKey: String
+    ) async throws -> String {
+        let messagePayload = messages.map { ["role": $0.role, "content": $0.content] }
+        return try await requestCompletion(
+            systemPrompt: "You are a professional Chinese blog writing assistant. Respond in Markdown. Keep responses concise and useful.",
+            messages: messagePayload,
+            profile: profile,
+            apiKey: apiKey,
+            temperature: 0.7
+        )
+    }
+
+    private func requestCompletion(
+        systemPrompt: String,
+        messages: [[String: String]],
+        profile: AIProfile,
+        apiKey: String,
+        temperature: Double
+    ) async throws -> String {
         let baseURL = profile.baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         let model = profile.model.trimmingCharacters(in: .whitespacesAndNewlines)
         let token = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -125,10 +156,7 @@ struct AIService {
         let payload: [String: Any] = [
             "model": model,
             "temperature": temperature,
-            "messages": [
-                ["role": "system", "content": systemPrompt],
-                ["role": "user", "content": userPrompt]
-            ]
+            "messages": [["role": "system", "content": systemPrompt]] + messages
         ]
 
         var request = URLRequest(url: url)

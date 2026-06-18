@@ -8,9 +8,15 @@ struct WritingView: View {
     @State private var categoriesInput = ""
     @State private var editorSelection = NSRange(location: 0, length: 0)
     @State private var showDeleteConfirm = false
+    @State private var pendingDeletePost: BlogPost?
     @State private var showingAIWritingSheet = false
     @State private var aiWritingSourceText = ""
     @State private var selectedWorkspacePickerCode = ""
+    @State private var autoSaveTimer: Timer?
+    @State private var lastAutoSaveContent = ""
+    @State private var showPreview = false
+    @State private var searchText = ""
+    @State private var showNewContentCard = true
 
     var body: some View {
         NavigationSplitView(columnVisibility: editorColumnVisibility) {
@@ -21,16 +27,25 @@ struct WritingView: View {
                 .navigationSplitViewColumnWidth(min: 600, ideal: 800, max: .infinity)
         }
         .navigationSplitViewStyle(.balanced)
-        .onAppear { refreshInputsFromPost() }
+        .onAppear { refreshInputsFromPost(); startAutoSave() }
+        .onDisappear { stopAutoSave() }
         .onChange(of: viewModel.selectedPostID) { _ in refreshInputsFromPost() }
         .onChange(of: viewModel.editorPost.tags) { _ in refreshInputsFromPost() }
         .onChange(of: viewModel.editorPost.categories) { _ in refreshInputsFromPost() }
         .sheet(isPresented: $showingAIWritingSheet) { aiWritingSheet }
         .alert("确认删除", isPresented: $showDeleteConfirm) {
-            Button("取消", role: .cancel) {}
-            Button("删除", role: .destructive) { viewModel.deleteCurrentPost() }
+            Button("取消", role: .cancel) { pendingDeletePost = nil }
+            Button("删除", role: .destructive) {
+                if let post = pendingDeletePost {
+                    selectAndDelete(post)
+                    pendingDeletePost = nil
+                } else {
+                    viewModel.deleteCurrentPost()
+                }
+            }
         } message: {
-            Text("确定要删除「\(viewModel.editorPost.title)」吗？此操作不可撤销。")
+            let title = pendingDeletePost?.title ?? viewModel.editorPost.title
+            Text("确定要删除「\(title)」吗？此操作不可撤销。")
         }
     }
 
@@ -41,20 +56,43 @@ struct WritingView: View {
             workspaceBar
             NookDivider()
 
-            if viewModel.posts.isEmpty {
+            // Search bar
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 11))
+                    .foregroundColor(.aiTextMuted)
+                TextField("搜索文章...", text: $searchText)
+                    .textFieldStyle(.plain)
+                    .font(.custom("Nunito-Regular", size: 12))
+                if !searchText.isEmpty {
+                    Button { searchText = "" } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 11))
+                            .foregroundColor(.aiTextMuted)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+
+            NookDivider()
+
+            if filteredPosts.isEmpty {
                 NookEmptyState(
                     icon: .docText,
-                    title: "还没有文章",
-                    subtitle: "在右侧创建你的第一篇内容"
+                    title: searchText.isEmpty ? "还没有文章" : "没有匹配的文章",
+                    subtitle: searchText.isEmpty ? "在右侧创建你的第一篇内容" : "尝试其他关键词"
                 )
             } else {
                 List {
-                    OutlineGroup(sidebarRoots, children: \.childNodes) { node in
+                    OutlineGroup(filteredSidebarRoots, children: \.childNodes) { node in
                         sidebarRow(for: node)
                             .contextMenu {
                                 if let post = node.post {
                                     Button("删除", role: .destructive) {
-                                        selectAndDelete(post)
+                                        pendingDeletePost = post
+                                        showDeleteConfirm = true
                                     }
                                 }
                             }
@@ -62,6 +100,21 @@ struct WritingView: View {
                 }
             }
         }
+    }
+
+    private var filteredPosts: [BlogPost] {
+        guard !searchText.isEmpty else { return viewModel.posts }
+        let query = searchText.lowercased()
+        return viewModel.posts.filter { post in
+            post.title.lowercased().contains(query) ||
+            post.fileName.lowercased().contains(query) ||
+            post.tags.contains(where: { $0.lowercased().contains(query) }) ||
+            post.categories.contains(where: { $0.lowercased().contains(query) })
+        }
+    }
+
+    private var filteredSidebarRoots: [WritingSidebarNode] {
+        WritingSidebarNode.buildTree(posts: filteredPosts, relativePath: relativeDisplayPath(for:))
     }
 
     private var workspaceBar: some View {
@@ -104,10 +157,21 @@ struct WritingView: View {
                             .frame(width: 16)
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(post.title.isEmpty ? post.displayFileName : post.title)
-                                .font(.custom("Nunito-SemiBold", size: 13))
-                                .foregroundColor(post.id == viewModel.selectedPostID ? .aiTextHeader : .aiTextBody)
-                                .lineLimit(1)
+                            HStack(spacing: 4) {
+                                Text(post.title.isEmpty ? post.displayFileName : post.title)
+                                    .font(.custom("Nunito-SemiBold", size: 13))
+                                    .foregroundColor(post.id == viewModel.selectedPostID ? .aiTextHeader : .aiTextBody)
+                                    .lineLimit(1)
+                                if post.draft {
+                                    Text("草稿")
+                                        .font(.custom("Nunito-Regular", size: 9))
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 4)
+                                        .padding(.vertical, 1)
+                                        .background(Color.aiWarning)
+                                        .clipShape(RoundedRectangle(cornerRadius: 3))
+                                }
+                            }
                             Text(relativeDisplayPath(for: post))
                                 .font(.custom("Nunito-Regular", size: 10))
                                 .foregroundColor(.aiTextMuted)
@@ -175,18 +239,34 @@ struct WritingView: View {
     private var newContentCard: some View {
         NookCard(color: .appBlue) {
             VStack(alignment: .leading, spacing: 10) {
-                Text("新建文章")
-                    .font(.custom("Nunito-Bold", size: 16))
-                    .foregroundColor(.aiTextHeader)
-
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 10) {
-                        newContentFields
-                        newContentActions
+                Button {
+                    withAnimation(NookAnimations.nookEase) {
+                        showNewContentCard.toggle()
                     }
-                    VStack(alignment: .leading, spacing: 10) {
-                        newContentFields
-                        newContentActions
+                } label: {
+                    HStack {
+                        Text("新建文章")
+                            .font(.custom("Nunito-Bold", size: 16))
+                            .foregroundColor(.aiTextHeader)
+                        Spacer()
+                        Image(systemName: showNewContentCard ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.aiTextSecondary)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                if showNewContentCard {
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 10) {
+                            newContentFields
+                            newContentActions
+                        }
+                        VStack(alignment: .leading, spacing: 10) {
+                            newContentFields
+                            newContentActions
+                        }
                     }
                 }
             }
@@ -221,19 +301,60 @@ struct WritingView: View {
                         .font(.custom("Nunito-Bold", size: 16))
                         .foregroundColor(.aiTextHeader)
                     Spacer()
+                    NookButton(.default, size: .small, icon: showPreview ? "pencil" : "eye", label: showPreview ? "编辑" : "预览") {
+                        showPreview.toggle()
+                    }
                     NookButton(.default, size: .small, icon: "wand.and.stars", label: "AI 写作") {
                         showingAIWritingSheet = true
                     }
                 }
 
-                MarkdownTextEditor(
-                    text: $viewModel.editorPost.body,
-                    selection: $editorSelection,
-                    onMenuAction: { _ in }
-                )
-                .frame(minHeight: 480)
-                .background(Color.aiBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                if showPreview {
+                    MarkdownPreviewView(markdown: viewModel.editorPost.body)
+                        .frame(minHeight: 480)
+                        .background(Color.aiBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                } else {
+                    VStack(spacing: 0) {
+                        // Markdown toolbar
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 4) {
+                                mdToolButton("H1", action: .heading1)
+                                mdToolButton("H2", action: .heading2)
+                                mdToolButton("H3", action: .heading3)
+                                Divider().frame(height: 16)
+                                mdToolButton("B", action: .bold)
+                                mdToolButton("I", action: .italic)
+                                mdToolButton("S", action: .strike)
+                                mdToolButton("<>", action: .inlineCode)
+                                Divider().frame(height: 16)
+                                mdToolButton("链接", action: .link)
+                                mdToolButton("图片", action: .image)
+                                mdToolButton("引用", action: .quote)
+                                mdToolButton("列表", action: .bulletList)
+                                mdToolButton("代码块", action: .codeBlock)
+                                mdToolButton("表格", action: .table)
+                                mdToolButton("---", action: .divider)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 6)
+                        }
+                        .background(Color.aiSecondaryBg)
+
+                        MarkdownTextEditor(
+                            text: $viewModel.editorPost.body,
+                            selection: $editorSelection,
+                            onMenuAction: { action in
+                                let result = MarkdownEditing.apply(action: action, to: viewModel.editorPost.body, selection: editorSelection)
+                                viewModel.editorPost.body = result.text
+                                editorSelection = result.selection
+                            }
+                        )
+                        .frame(minHeight: 460)
+                    }
+                    .background(Color.aiBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
 
                 NookDivider()
 
@@ -251,6 +372,14 @@ struct WritingView: View {
 
                     Spacer()
 
+                    // Word count
+                    let body = viewModel.editorPost.body
+                    let charCount = body.count
+                    let wordCount = body.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }.count
+                    Text("\(charCount) 字 · \(wordCount) 词")
+                        .font(.custom("Nunito-Regular", size: 11))
+                        .foregroundColor(.aiTextMuted)
+
                     NookButton(.danger, size: .small, label: "删除") {
                         showDeleteConfirm = true
                     }
@@ -263,6 +392,23 @@ struct WritingView: View {
     }
 
     // MARK: - Inspector
+
+    private func mdToolButton(_ label: String, action: MarkdownAction) -> some View {
+        Button {
+            let result = MarkdownEditing.apply(action: action, to: viewModel.editorPost.body, selection: editorSelection)
+            viewModel.editorPost.body = result.text
+            editorSelection = result.selection
+        } label: {
+            Text(label)
+                .font(.custom("Nunito-SemiBold", size: 11))
+                .foregroundColor(.aiTextBody)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .background(Color.aiBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+        }
+        .buttonStyle(.plain)
+    }
 
     private var inspectorPanel: some View {
         NookCard(color: .appYellow) {
@@ -641,6 +787,28 @@ struct WritingView: View {
         formatter.locale = Locale(identifier: "zh_CN")
         formatter.dateFormat = "MM-dd HH:mm"
         return formatter.string(from: date)
+    }
+
+    // MARK: - Auto-save
+
+    private func startAutoSave() {
+        lastAutoSaveContent = viewModel.editorPost.body
+        autoSaveTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in
+            Task { @MainActor in
+                let current = viewModel.editorPost.body
+                if current != lastAutoSaveContent && !current.isEmpty {
+                    applyInputsToPost()
+                    viewModel.saveCurrentPost()
+                    lastAutoSaveContent = current
+                    viewModel.log(category: "写作", action: "自动保存", detail: "每30秒自动保存")
+                }
+            }
+        }
+    }
+
+    private func stopAutoSave() {
+        autoSaveTimer?.invalidate()
+        autoSaveTimer = nil
     }
 
     private var editorColumnVisibility: Binding<NavigationSplitViewVisibility> {

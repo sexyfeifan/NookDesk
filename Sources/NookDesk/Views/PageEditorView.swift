@@ -244,7 +244,18 @@ struct PageEditorView: View {
             return
         }
 
-        content = replaceText(in: content, pattern: #"<title>[^<]+</title>"#, replacement: "<title>\(astroSiteTitle)</title>")
+        content = replaceText(in: content, pattern: #"<title>[^<]+</title>"#, replacement: "<title>\(escapeForHTML(astroSiteTitle))</title>")
+
+        // Save site description back to meta tag
+        if let descRange = content.range(of: #"<meta name="description""#) {
+            let afterDesc = content[descRange.upperBound...]
+            if let closeRange = afterDesc.range(of: ">") {
+                let descTag = String(content[descRange.lowerBound..<closeRange.upperBound])
+                let escapedDesc = escapeForHTML(astroSiteDescription)
+                let newDescTag = #"<meta name="description" content="\#(escapedDesc)""#
+                content = content.replacingOccurrences(of: descTag, with: newDescTag)
+            }
+        }
 
         do {
             try content.write(to: layoutURL, atomically: true, encoding: .utf8)
@@ -264,13 +275,13 @@ struct PageEditorView: View {
         }
 
         let newItems = astroProjects.map { p in
-            let techArray = p.tech.split(separator: ",").map { "'\($0.trimmingCharacters(in: .whitespaces))'" }.joined(separator: ", ")
+            let techArray = p.tech.split(separator: ",").map { "'\(escapeForJSString($0.trimmingCharacters(in: .whitespaces)))'" }.joined(separator: ", ")
             return """
                 {
-                    name: '\(p.name)',
-                    description: '\(p.description)',
-                    emoji: '\(p.emoji)',
-                    url: '\(p.url)',
+                    name: '\(escapeForJSString(p.name))',
+                    description: '\(escapeForJSString(p.description))',
+                    emoji: '\(escapeForJSString(p.emoji))',
+                    url: '\(escapeForJSString(p.url))',
                     tech: [\(techArray)],
                 }
             """
@@ -296,10 +307,10 @@ struct PageEditorView: View {
         let newItems = astroFriends.map { f in
             """
                 {
-                    name: '\(f.name)',
-                    description: '\(f.description)',
-                    avatar: '\(f.avatar)',
-                    url: '\(f.url)',
+                    name: '\(escapeForJSString(f.name))',
+                    description: '\(escapeForJSString(f.description))',
+                    avatar: '\(escapeForJSString(f.avatar))',
+                    url: '\(escapeForJSString(f.url))',
                 }
             """
         }.joined(separator: ",\n")
@@ -314,6 +325,22 @@ struct PageEditorView: View {
     }
 
     // MARK: - Helpers
+
+    private func escapeForHTML(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+    }
+
+    private func escapeForJSString(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "'", with: "\\'")
+            .replacingOccurrences(of: "\n", with: "\\n")
+            .replacingOccurrences(of: "\r", with: "\\r")
+    }
 
     private func extractText(in text: String, pattern: String) -> String? {
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
@@ -339,17 +366,22 @@ struct PageEditorView: View {
     private func parseProjects(from content: String) -> [AstroProjectItem] {
         guard let block = extractArrayBlock(in: content, marker: "const projects") else { return [] }
         var items: [AstroProjectItem] = []
-        let pattern = #"name:\s*'([^']+)'[\s\S]*?description:\s*'([^']+)'[\s\S]*?emoji:\s*'([^']+)'[\s\S]*?url:\s*'([^']+)'"#
+        let pattern = #"name:\s*'([^']*)'[\s\S]*?description:\s*'([^']*)'[\s\S]*?emoji:\s*'([^']*)'[\s\S]*?url:\s*'([^']*)'[\s\S]*?tech:\s*\[([^\]]*)\]"#
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
         let ns = block as NSString
         for match in regex.matches(in: block, range: NSRange(location: 0, length: ns.length)) {
-            if match.numberOfRanges > 4 {
+            if match.numberOfRanges > 5 {
+                let techRaw = ns.substring(with: match.range(at: 5))
+                let tech = techRaw.split(separator: ",")
+                    .map { $0.trimmingCharacters(in: .whitespaces).trimmingCharacters(in: CharacterSet(charactersIn: "'\"")) }
+                    .filter { !$0.isEmpty }
+                    .joined(separator: ", ")
                 items.append(AstroProjectItem(
                     name: ns.substring(with: match.range(at: 1)),
                     description: ns.substring(with: match.range(at: 2)),
                     emoji: ns.substring(with: match.range(at: 3)),
                     url: ns.substring(with: match.range(at: 4)),
-                    tech: ""
+                    tech: tech
                 ))
             }
         }
