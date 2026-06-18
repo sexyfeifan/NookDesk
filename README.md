@@ -1,4 +1,4 @@
-# HugoDesk
+# NookDesk
 
 **macOS 博客管理工作台** — Astro 专属，动森风格 UI
 
@@ -6,9 +6,9 @@
 
 ## 下载安装
 
-1. 前往 [Releases](https://github.com/sexyfeifan/HugoDesk/releases) 页面
-2. 下载最新版本的 `HugoDesk-v2.0.0-universal.dmg`
-3. 双击 DMG，将 HugoDesk.app 拖入 Applications 文件夹
+1. 前往 [Releases](https://github.com/sexyfeifan/NookDesk/releases) 页面
+2. 下载最新版本的 `NookDesk-v2.0.0-universal.dmg`
+3. 双击 DMG，将 NookDesk.app 拖入 Applications 文件夹
 4. 首次打开可能需要在 系统设置 > 隐私与安全 中允许运行
 
 > 支持 Intel (x86_64) 和 Apple Silicon (arm64) 双架构，最低系统要求 macOS 13
@@ -19,13 +19,13 @@
 
 ### 第一步：Fork 博客模板
 
-1. 打开 [animal-island-blog-astro](https://github.com/sexyfeifan/sexyfeifan.github.io)（或使用 HugoDesk 内置模板）
+1. 打开 [animal-island-blog-astro](https://github.com/sexyfeifan/sexyfeifan.github.io)（或使用 NookDesk 内置模板）
 2. 点击右上角 **Fork** 按钮
 3. 进入 **Settings > Pages**，将 Source 改为 **GitHub Actions**
 
-### 第二步：配置 HugoDesk
+### 第二步：配置 NookDesk
 
-1. 启动 HugoDesk，进入引导流程
+1. 启动 NookDesk，进入引导流程
 2. 选择本地博客目录或从 GitHub 克隆
 3. 填写 GitHub Token（推荐 Fine-grained Token）
 4. 完成配置
@@ -115,7 +115,7 @@ draft: false
 1. GitHub > Settings > Developer settings > Personal access tokens > Fine-grained tokens
 2. Generate new token，选择你的博客仓库
 3. Permissions：Contents (Read and write)、Pages (Read and write)、Actions (Read)
-4. 在 HugoDesk 设置中粘贴 Token
+4. 在 NookDesk 设置中粘贴 Token
 
 ---
 
@@ -130,7 +130,7 @@ draft: false
 ## 项目结构
 
 ```
-HugoDesk/
+NookDesk/
 ├── v0.8.0/                    ← 当前版本源码
 │   ├── Sources/NookDesk/
 │   │   ├── Backends/          ← Astro SSG 后端
