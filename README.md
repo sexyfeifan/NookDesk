@@ -131,31 +131,25 @@ draft: false
 
 ```
 NookDesk/
-├── v0.8.0/                    ← 当前版本源码
-│   ├── Sources/NookDesk/
-│   │   ├── Backends/          ← Astro SSG 后端
-│   │   ├── DesignSystem/      ← 动森风格 UI 组件
-│   │   ├── Models/            ← 数据模型
-│   │   ├── Services/          ← 业务逻辑
-│   │   ├── ViewModels/        ← 视图模型
-│   │   ├── Views/             ← 界面视图
-│   │   └── Resources/         ← 模板和 Wiki 文档
-│   └── Package.swift
-├── archive/                   ← 历史版本归档
-├── README.md
-└── Package.swift
+├── Sources/NookDesk/
+│   ├── Backends/          ← Astro SSG 后端
+│   ├── DesignSystem/      ← 动森风格 UI 组件
+│   ├── Models/            ← 数据模型
+│   ├── Services/          ← 业务逻辑
+│   ├── ViewModels/        ← 视图模型
+│   ├── Views/             ← 界面视图
+│   └── Resources/         ← 模板和 Wiki 文档
+├── Assets/                ← 应用图标
+├── Assets.xcassets/       ← Asset Catalog
+├── Package.swift
+└── README.md
 ```
 
 ## 版本历史
 
 | 版本 | 日期 | 说明 |
 |------|------|------|
-| v2.0.0 | 2026-06-15 | 简化为纯 Astro 架构、移除 Hugo/Vite 后端、简化发布流程 |
-| v1.3.4 | 2026-06-14 | 逐行审查修复 |
-| v1.3.3 | 2026-06-11 | 深度审计修复 |
-| v1.3.0 | 2026-06-11 | 全面审计修复 |
-| v1.0.0 | 2026-06-06 | 重写文章解析 |
-| v0.8.0 | 2026-06-05 | 动森设计系统、3-tab 界面 |
+| v2.0.0 | 2026-06-18 | 项目结构重组、纯 Astro 架构、源码提升到根目录 |
 
 ## 许可证
 
