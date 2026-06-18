@@ -131,7 +131,8 @@ struct WizardView: View {
                             }
                         }
                     } else if currentStep < stepCount - 1 {
-                        NookButton(.primary, size: .medium, label: "下一步") {
+                        let isCreateFlow = currentStep == 1 && projectPath.isEmpty && showCreateNew && !createPath.isEmpty
+                        NookButton(.primary, size: .medium, label: isCreateFlow ? "创建并下一步" : "下一步") {
                             advanceStep()
                         }
                         .disabled(!canAdvance)
@@ -169,7 +170,9 @@ struct WizardView: View {
 
     private var canAdvance: Bool {
         switch currentStep {
-        case 1: return !projectPath.isEmpty
+        case 1:
+            // 支持两种流程：已有项目路径 OR 创建新博客时已选择保存路径
+            return !projectPath.isEmpty || (showCreateNew && !createPath.isEmpty)
         case 2: return !githubRemoteURL.isEmpty
         default: return true
         }
@@ -610,6 +613,29 @@ struct WizardView: View {
     private func advanceStep() {
         wizardError = nil
         if currentStep == 1 {
+            // 如果 projectPath 为空但 createPath 有值（创建新博客流程），先自动创建
+            if projectPath.isEmpty && !createPath.isEmpty && showCreateNew {
+                runCreateNew()
+                // runCreateNew 是异步的，等它完成后再 advance
+                // 用 Timer 轮询 projectPath 是否已设置
+                var waitCount = 0
+                Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { timer in
+                    waitCount += 1
+                    if !self.projectPath.isEmpty {
+                        timer.invalidate()
+                        DispatchQueue.main.async {
+                            self.advanceStep()
+                        }
+                    } else if waitCount > 60 { // 最多等 30 秒
+                        timer.invalidate()
+                        DispatchQueue.main.async {
+                            self.wizardError = "创建博客超时，请重试。"
+                        }
+                    }
+                }
+                return
+            }
+
             let trimmed = projectPath.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { return }
 
