@@ -72,6 +72,19 @@ struct ConfigBackupBundle: Codable {
         case githubToken
     }
 
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(schemaVersion, forKey: .schemaVersion)
+        try container.encode(exportedAt, forKey: .exportedAt)
+        try container.encode(project, forKey: .project)
+        try container.encode(themeConfig, forKey: .themeConfig)
+        try container.encode(remoteProfile, forKey: .remoteProfile)
+        try container.encode(githubTokenClassic, forKey: .githubTokenClassic)
+        try container.encode(githubTokenFineGrained, forKey: .githubTokenFineGrained)
+        try container.encode(aiProfile, forKey: .aiProfile)
+        try container.encode(aiAPIKey, forKey: .aiAPIKey)
+    }
+
     func sanitized() -> ConfigBackupBundle {
         var copy = self
         copy.githubTokenClassic = githubTokenClassic.isEmpty ? "" : "•••••"

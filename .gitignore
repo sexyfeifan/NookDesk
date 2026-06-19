@@ -3,3 +3,10 @@ dist/
 *.dmg
 .DS_Store
 node_modules/
+
+# GitSync 自动添加
+Thumbs.db
+*.swp
+*~
+.AppleDouble
+.LSOverride

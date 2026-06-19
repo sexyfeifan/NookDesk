@@ -1,18 +1,21 @@
 import Foundation
 
+private final class AskPassCleanup: @unchecked Sendable {
+    static let shared = AskPassCleanup()
+    var pendingPaths: Set<String> = []
+    var installed = false
+}
+
 final class PublishService {
     private let runner = ProcessRunner()
     private let fm = FileManager.default
 
-    // MARK: - Signal-safe cleanup for temp askpass scripts
-    static var pendingAskPassPaths: Set<String> = []
-    private static var signalCleanupInstalled = false
-
     static func installSignalCleanupIfNeeded() {
-        guard !signalCleanupInstalled else { return }
-        signalCleanupInstalled = true
+        let state = AskPassCleanup.shared
+        guard !state.installed else { return }
+        state.installed = true
         let cleanup: @convention(c) (Int32) -> Void = { sig in
-            for path in pendingAskPassPaths {
+            for path in AskPassCleanup.shared.pendingPaths {
                 try? FileManager.default.removeItem(atPath: path)
             }
             _exit(128 + sig)
@@ -365,7 +368,7 @@ final class PublishService {
         }
         #if os(macOS)
         // Signal handler cleanup — store path in a global so C-convention handler can access it
-        Self.pendingAskPassPaths.insert(scriptURL.path)
+        AskPassCleanup.shared.pendingPaths.insert(scriptURL.path)
         Self.installSignalCleanupIfNeeded()
         #endif
 
